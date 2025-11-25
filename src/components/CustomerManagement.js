@@ -28,10 +28,7 @@ const CustomerManagement = () => {
   const [ticketProductData, setTicketProductData] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, type: '', id: null });
   const { notification, showNotification, hideNotification } = useNotification();
-<<<<<<< HEAD
   const [viewMode, setViewMode] = useState("grid"); // "grid" or "table"
-=======
->>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
   
   // Determine view from URL path
   const pathParts = location.pathname.split('/').filter(Boolean);
@@ -432,7 +429,6 @@ const CustomerManagement = () => {
         </div>
 
         <div className="products-section-header">
-<<<<<<< HEAD
           <div className="header-main">
             <h2>Product Tickets ({productTickets.length})</h2>
             
@@ -456,9 +452,6 @@ const CustomerManagement = () => {
               </div>
             </div>
           </div>
-=======
-          <h2>Product Tickets ({productTickets.length})</h2>
->>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
         </div>
 
         {/* Tickets List - Card Grid View */}
@@ -466,10 +459,7 @@ const CustomerManagement = () => {
           {isLoadingTickets ? (
             <Loader message="Loading product tickets..." size="medium" />
           ) : productTickets.length > 0 ? (
-<<<<<<< HEAD
             viewMode === "grid" ? (
-=======
->>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
             <div className="tickets-grid">
               {productTickets.map(ticket => (
                 <div key={ticket.id} className={`ticket-card priority-${ticket.priority?.toLowerCase() || "medium"}`}>
@@ -502,15 +492,6 @@ const CustomerManagement = () => {
                           <span className="info-value">{ticket.serialNumber}</span>
                         </div>
                       )}
-<<<<<<< HEAD
-=======
-                      {ticket.issueType && (
-                        <div className="info-row">
-                          <span className="info-label">Issue Type</span>
-                          <span className="info-value">{ticket.issueType}</span>
-                        </div>
-                      )}
->>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
                       {ticket.createdBy && (
                         <div className="info-row">
                           <span className="info-label">Created By</span>
@@ -546,7 +527,6 @@ const CustomerManagement = () => {
                 </div>
               ))}
             </div>
-<<<<<<< HEAD
             ) : (
               <div className="tickets-table-container">
                 <div className="table-responsive">
@@ -614,8 +594,6 @@ const CustomerManagement = () => {
                 </div>
               </div>
             )
-=======
->>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
           ) : (
             <div className="empty-state">
               <div className="empty-icon">🎫</div>
