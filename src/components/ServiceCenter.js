@@ -21,7 +21,10 @@ const ServiceCenter = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null, name: '' });
   const { notification, showNotification, hideNotification } = useNotification();
+<<<<<<< HEAD
   const [viewMode, setViewMode] = useState("grid"); // "grid" or "table"
+=======
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
   
   // Get selected service from URL
   const selectedService = serviceId ? services.find(s => s.id === serviceId) : null;
@@ -188,6 +191,7 @@ const ServiceCenter = () => {
         </div>
 
         <div className="tickets-section">
+<<<<<<< HEAD
           <div className="tickets-header">
             <div className="header-main">
               <h2>Assigned Tickets ({serviceTickets.length})</h2>
@@ -216,6 +220,10 @@ const ServiceCenter = () => {
           
           {serviceTickets.length > 0 ? (
             viewMode === "grid" ? (
+=======
+          <h2>Assigned Tickets ({serviceTickets.length})</h2>
+          {serviceTickets.length > 0 ? (
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
             <div className="tickets-grid">
               {serviceTickets.map(ticket => (
                 <div 
@@ -242,6 +250,15 @@ const ServiceCenter = () => {
                         <span className="info-label">Product</span>
                         <span className="info-value">{ticket.productName}</span>
                       </div>
+<<<<<<< HEAD
+=======
+                      {ticket.issueType && (
+                        <div className="info-row">
+                          <span className="info-label">Issue Type</span>
+                          <span className="info-value">{ticket.issueType}</span>
+                        </div>
+                      )}
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
                     </div>
 
                     <div className="meta-section">
@@ -268,6 +285,7 @@ const ServiceCenter = () => {
                 </div>
               ))}
             </div>
+<<<<<<< HEAD
             ) : (
               <div className="tickets-table-container">
                 <div className="table-responsive">
@@ -319,6 +337,8 @@ const ServiceCenter = () => {
                 </div>
               </div>
             )
+=======
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
           ) : (
             <div className="empty-state">
               <p>No tickets assigned to this service center yet.</p>

@@ -283,12 +283,15 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
   }, []);
 
   const handleDelete = (id, userId) => {
+<<<<<<< HEAD
     // Check if current admin is the one who created the ticket
     const currentUserId = getCurrentUserId();
     if (currentUserId !== userId) {
       showNotification('You are not authorized to delete this ticket. Only the admin who created it can make changes.', 'warning');
       return;
     }
+=======
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
     setConfirmDialog({ isOpen: true, type: 'delete', ticketId: id, userId: userId });
   };
 
@@ -323,12 +326,15 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
   };
 
   const handleStatusChange = (id, newStatus, userId) => {
+<<<<<<< HEAD
     // Check if current admin is the one who created the ticket
     const currentUserId = getCurrentUserId();
     if (currentUserId !== userId) {
       showNotification('You are not authorized to modify this ticket. Only the admin who created it can make changes.', 'warning');
       return;
     }
+=======
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
     if (newStatus === "Resolved") {
       setConfirmDialog({ isOpen: true, type: 'resolve', ticketId: id, userId: userId });
     } else {
@@ -610,6 +616,15 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                       <span className="info-label">Product</span>
                       <span className="info-value">{ticket.productName}</span>
                     </div>
+<<<<<<< HEAD
+=======
+                    {ticket.issueType && (
+                      <div className="info-row">
+                        <span className="info-label">Issue Type</span>
+                        <span className="info-value">{ticket.issueType}</span>
+                      </div>
+                    )}
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
                     {ticket.createdBy && (
                       <div className="info-row">
                         <span className="info-label">Created By</span>
@@ -771,6 +786,10 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                       <th>Ticket #</th>
                       <th>Customer</th>
                       <th>Product</th>
+<<<<<<< HEAD
+=======
+                      <th>Issue Type</th>
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
                       <th>Created By</th>
                       <th>Priority</th>
                       <th>Status</th>
@@ -788,6 +807,10 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                         <td className="ticket-number-cell">#{ticket.ticketNumber}</td>
                         <td className="customer-cell">{ticket.customerName}</td>
                         <td className="product-cell">{ticket.productName}</td>
+<<<<<<< HEAD
+=======
+                        <td className="issue-cell">{ticket.issueType || 'N/A'}</td>
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
                         <td className="admin-cell">
                           {ticket.createdBy ? (
                             <span className="admin-name-table">👤 {ticket.createdBy}</span>
@@ -898,6 +921,13 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                         <span className="mobile-info-label">Product</span>
                         <span className="mobile-info-value">{ticket.productName}</span>
                       </div>
+<<<<<<< HEAD
+=======
+                      <div className="mobile-info-row">
+                        <span className="mobile-info-label">Issue Type</span>
+                        <span className="mobile-info-value">{ticket.issueType || 'N/A'}</span>
+                      </div>
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
                       {ticket.createdBy && (
                         <div className="mobile-info-row">
                           <span className="mobile-info-label">Created By</span>

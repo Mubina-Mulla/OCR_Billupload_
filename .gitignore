@@ -3,5 +3,8 @@ node_modules/
 dist/
 build/
 *.log
+<<<<<<< HEAD
 
 
+=======
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526

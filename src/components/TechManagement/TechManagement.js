@@ -28,7 +28,10 @@ const Technicians = () => {
   const { notification, showNotification, hideNotification } = useNotification();
   const [showHistory, setShowHistory] = useState(false);
   const [customerTransactions, setCustomerTransactions] = useState([]);
+<<<<<<< HEAD
   const [viewMode, setViewMode] = useState("grid"); // "grid" or "table"
+=======
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
   
   // Get selected tech from URL
   const selectedTech = techId ? technicians.find(t => t.id === techId) : null;
@@ -348,6 +351,7 @@ const Technicians = () => {
           <div className="tickets-header">
             <div className="header-main">
               <h2>Assigned Tickets ({techTickets.length})</h2>
+<<<<<<< HEAD
               
               <div className="view-toggle-section">
                 <label className="filter-label">View:</label>
@@ -368,6 +372,8 @@ const Technicians = () => {
                   </button>
                 </div>
               </div>
+=======
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
             </div>
             
             <div className="filter-buttons-container">
@@ -455,7 +461,10 @@ const Technicians = () => {
             </div>
           </div>
           {techTickets.length > 0 ? (
+<<<<<<< HEAD
             viewMode === "grid" ? (
+=======
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
             <div className="tickets-grid">
               {techTickets.map(ticket => {
                 const getPriorityColor = (priority) => {
@@ -524,6 +533,15 @@ const Technicians = () => {
                           <span className="info-label">PRODUCT</span>
                           <span className="info-value">{ticket.productName}</span>
                         </div>
+<<<<<<< HEAD
+=======
+                        {ticket.issueType && (
+                          <div className="info-row">
+                            <span className="info-label">ISSUE TYPE</span>
+                            <span className="info-value">{ticket.issueType}</span>
+                          </div>
+                        )}
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
                         {ticket.createdBy && (
                           <div className="info-row">
                             <span className="info-label">CREATED BY</span>
@@ -604,6 +622,7 @@ const Technicians = () => {
                 );
               })}
             </div>
+<<<<<<< HEAD
             ) : (
               <div className="tickets-table-container">
                 <div className="table-responsive">
@@ -734,6 +753,8 @@ const Technicians = () => {
                 </div>
               </div>
             )
+=======
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
           ) : (
             <div className="empty-state">
               <p>No tickets assigned to this technician yet.</p>

@@ -21,7 +21,10 @@ const TechnicianPortal = () => {
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [selectedDate, setSelectedDate] = useState("");
   const [isLoadingTickets, setIsLoadingTickets] = useState(true);
+<<<<<<< HEAD
   const [viewMode, setViewMode] = useState("grid"); // "grid" or "table"
+=======
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
 
   useEffect(() => {
     // Fetch technicians
@@ -327,6 +330,7 @@ const TechnicianPortal = () => {
         <div className="tickets-header">
           <div className="header-main">
             <h2>My Assigned Tickets ({techTickets.length})</h2>
+<<<<<<< HEAD
             
             <div className="view-toggle-section">
               <label className="filter-label">View:</label>
@@ -347,6 +351,8 @@ const TechnicianPortal = () => {
                 </button>
               </div>
             </div>
+=======
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
           </div>
           
           <div className="filter-buttons-container">
@@ -414,7 +420,10 @@ const TechnicianPortal = () => {
         </div>
 
         {techTickets.length > 0 ? (
+<<<<<<< HEAD
           viewMode === "grid" ? (
+=======
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
           <div className="tickets-grid">
             {techTickets.map(ticket => (
               <div key={ticket.id} className="ticket-card">
@@ -431,6 +440,15 @@ const TechnicianPortal = () => {
                     <span className="label">Product</span>
                     <span className="value">{ticket.productName}</span>
                   </div>
+<<<<<<< HEAD
+=======
+                  {ticket.issueType && (
+                    <div className="ticket-row">
+                      <span className="label">Issue Type</span>
+                      <span className="value">{ticket.issueType}</span>
+                    </div>
+                  )}
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
                   {ticket.serviceAmount && (
                     <div className="ticket-row">
                       <span className="label">Service Amount</span>
@@ -499,6 +517,7 @@ const TechnicianPortal = () => {
               </div>
             ))}
           </div>
+<<<<<<< HEAD
           ) : (
             <div className="tickets-table-container">
               <div className="table-responsive">
@@ -565,6 +584,8 @@ const TechnicianPortal = () => {
               </div>
             </div>
           )
+=======
+>>>>>>> 236998c0d20120fb43f979ae17cc820fcd3d9526
         ) : (
           <div className="empty-state">
             <p>No tickets assigned yet</p>
