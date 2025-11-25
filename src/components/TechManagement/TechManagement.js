@@ -28,6 +28,7 @@ const Technicians = () => {
   const { notification, showNotification, hideNotification } = useNotification();
   const [showHistory, setShowHistory] = useState(false);
   const [customerTransactions, setCustomerTransactions] = useState([]);
+  const [viewMode, setViewMode] = useState("grid"); // "grid" or "table"
   
   // Get selected tech from URL
   const selectedTech = techId ? technicians.find(t => t.id === techId) : null;
@@ -347,6 +348,26 @@ const Technicians = () => {
           <div className="tickets-header">
             <div className="header-main">
               <h2>Assigned Tickets ({techTickets.length})</h2>
+              
+              <div className="view-toggle-section">
+                <label className="filter-label">View:</label>
+                <div className="view-toggle-buttons">
+                  <button
+                    className={`view-toggle-btn ${viewMode === "grid" ? "active" : ""}`}
+                    onClick={() => setViewMode("grid")}
+                  >
+                    <span className="view-icon">⊞</span>
+                    Grid
+                  </button>
+                  <button
+                    className={`view-toggle-btn ${viewMode === "table" ? "active" : ""}`}
+                    onClick={() => setViewMode("table")}
+                  >
+                    <span className="view-icon">☰</span>
+                    Table
+                  </button>
+                </div>
+              </div>
             </div>
             
             <div className="filter-buttons-container">
@@ -434,6 +455,7 @@ const Technicians = () => {
             </div>
           </div>
           {techTickets.length > 0 ? (
+            viewMode === "grid" ? (
             <div className="tickets-grid">
               {techTickets.map(ticket => {
                 const getPriorityColor = (priority) => {
@@ -502,12 +524,6 @@ const Technicians = () => {
                           <span className="info-label">PRODUCT</span>
                           <span className="info-value">{ticket.productName}</span>
                         </div>
-                        {ticket.issueType && (
-                          <div className="info-row">
-                            <span className="info-label">ISSUE TYPE</span>
-                            <span className="info-value">{ticket.issueType}</span>
-                          </div>
-                        )}
                         {ticket.createdBy && (
                           <div className="info-row">
                             <span className="info-label">CREATED BY</span>
@@ -588,6 +604,136 @@ const Technicians = () => {
                 );
               })}
             </div>
+            ) : (
+              <div className="tickets-table-container">
+                <div className="table-responsive">
+                  <table className="tickets-table">
+                    <thead>
+                      <tr>
+                        <th>Ticket #</th>
+                        <th>Customer</th>
+                        <th>Product</th>
+                        <th>Category</th>
+                        <th>Created By</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Service Amount</th>
+                        <th>Commission</th>
+                        <th>Total Amount</th>
+                        <th>Start Date</th>
+                        <th>End Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {techTickets.map(ticket => {
+                        const getPriorityColor = (priority) => {
+                          switch (priority?.toLowerCase()) {
+                            case "high": return "#dc2626";
+                            case "medium": return "#facc15";
+                            case "low": return "#16a34a";
+                            default: return "#6b7280";
+                          }
+                        };
+
+                        const getStatusColor = (status) => {
+                          switch (status) {
+                            case "Pending": return "#f59e0b";
+                            case "In Progress": return "#3b82f6";
+                            case "Resolved": return "#10b981";
+                            default: return "#6b7280";
+                          }
+                        };
+
+                        const getStatusIcon = (status) => {
+                          switch (status) {
+                            case "Pending": return "⏳";
+                            case "In Progress": return "🔄";
+                            case "Resolved": return "✅";
+                            default: return "📋";
+                          }
+                        };
+
+                        const isResolved = ticket.status === "Resolved";
+
+                        return (
+                          <tr key={ticket.id}>
+                            <td className="ticket-number-cell">#{ticket.ticketNumber}</td>
+                            <td>{ticket.customerName}</td>
+                            <td>{ticket.productName}</td>
+                            <td>
+                              <span className="meta-category">{ticket.category || 'Third Party'}</span>
+                            </td>
+                            <td>
+                              {ticket.createdBy ? (
+                                <span className="admin-name-table">👤 {ticket.createdBy}</span>
+                              ) : (
+                                <span className="admin-name-table unknown">Unknown</span>
+                              )}
+                            </td>
+                            <td>
+                              <div 
+                                className="priority-tag-small"
+                                style={{ 
+                                  backgroundColor: isResolved ? "#10b981" : getPriorityColor(ticket.priority),
+                                  color: 'white'
+                                }}
+                              >
+                                {isResolved ? "COMPLETED" : (ticket.priority?.toUpperCase() || 'MEDIUM')}
+                              </div>
+                            </td>
+                            <td>
+                              <div 
+                                className="status-badge-small" 
+                                style={{ 
+                                  backgroundColor: isResolved ? "#10b981" : getStatusColor(ticket.status || 'Pending'),
+                                  color: 'white'
+                                }}
+                              >
+                                <span className="status-icon">
+                                  {isResolved ? "✅" : getStatusIcon(ticket.status || 'Pending')}
+                                </span>
+                                {ticket.status || 'Pending'}
+                              </div>
+                            </td>
+                            <td>
+                              {(ticket.category === "Third Party" || ticket.category === "In Store") && ticket.serviceAmount 
+                                ? `₹${ticket.serviceAmount}` 
+                                : '-'}
+                            </td>
+                            <td>
+                              {(ticket.category === "Third Party" || ticket.category === "In Store") && ticket.commissionAmount 
+                                ? `₹${ticket.commissionAmount}` 
+                                : '-'}
+                            </td>
+                            <td>
+                              {(ticket.category === "Third Party" || ticket.category === "In Store") && ticket.serviceAmount && ticket.commissionAmount 
+                                ? <span style={{ fontWeight: 700, color: '#16a34a' }}>
+                                    ₹{(parseFloat(ticket.serviceAmount) - parseFloat(ticket.commissionAmount)).toFixed(2)}
+                                  </span>
+                                : '-'}
+                            </td>
+                            <td>
+                              {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('en-GB', { 
+                                day: '2-digit', 
+                                month: '2-digit', 
+                                year: 'numeric' 
+                              }) : 'N/A'}
+                            </td>
+                            <td>
+                              {ticket.endDate ? new Date(ticket.endDate).toLocaleDateString('en-GB', { 
+                                day: '2-digit', 
+                                month: '2-digit', 
+                                year: 'numeric' 
+                              }) : 'Not set'}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
           ) : (
             <div className="empty-state">
               <p>No tickets assigned to this technician yet.</p>

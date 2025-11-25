@@ -28,6 +28,7 @@ const CustomerManagement = () => {
   const [ticketProductData, setTicketProductData] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, type: '', id: null });
   const { notification, showNotification, hideNotification } = useNotification();
+  const [viewMode, setViewMode] = useState("grid"); // "grid" or "table"
   
   // Determine view from URL path
   const pathParts = location.pathname.split('/').filter(Boolean);
@@ -428,7 +429,29 @@ const CustomerManagement = () => {
         </div>
 
         <div className="products-section-header">
-          <h2>Product Tickets ({productTickets.length})</h2>
+          <div className="header-main">
+            <h2>Product Tickets ({productTickets.length})</h2>
+            
+            <div className="view-toggle-section">
+              <label className="filter-label">View:</label>
+              <div className="view-toggle-buttons">
+                <button
+                  className={`view-toggle-btn ${viewMode === "grid" ? "active" : ""}`}
+                  onClick={() => setViewMode("grid")}
+                >
+                  <span className="view-icon">⊞</span>
+                  Grid
+                </button>
+                <button
+                  className={`view-toggle-btn ${viewMode === "table" ? "active" : ""}`}
+                  onClick={() => setViewMode("table")}
+                >
+                  <span className="view-icon">☰</span>
+                  Table
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Tickets List - Card Grid View */}
@@ -436,6 +459,7 @@ const CustomerManagement = () => {
           {isLoadingTickets ? (
             <Loader message="Loading product tickets..." size="medium" />
           ) : productTickets.length > 0 ? (
+            viewMode === "grid" ? (
             <div className="tickets-grid">
               {productTickets.map(ticket => (
                 <div key={ticket.id} className={`ticket-card priority-${ticket.priority?.toLowerCase() || "medium"}`}>
@@ -466,12 +490,6 @@ const CustomerManagement = () => {
                         <div className="info-row">
                           <span className="info-label">Serial Number</span>
                           <span className="info-value">{ticket.serialNumber}</span>
-                        </div>
-                      )}
-                      {ticket.issueType && (
-                        <div className="info-row">
-                          <span className="info-label">Issue Type</span>
-                          <span className="info-value">{ticket.issueType}</span>
                         </div>
                       )}
                       {ticket.createdBy && (
@@ -509,6 +527,73 @@ const CustomerManagement = () => {
                 </div>
               ))}
             </div>
+            ) : (
+              <div className="tickets-table-container">
+                <div className="table-responsive">
+                  <table className="tickets-table">
+                    <thead>
+                      <tr>
+                        <th>Ticket #</th>
+                        <th>Customer</th>
+                        <th>Product</th>
+                        <th>Serial Number</th>
+                        <th>Category</th>
+                        <th>Created By</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Assigned To</th>
+                        <th>Created Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productTickets.map(ticket => (
+                        <tr key={ticket.id}>
+                          <td className="ticket-number-cell">#{ticket.ticketNumber}</td>
+                          <td>{ticket.customerName}</td>
+                          <td>{ticket.productName}</td>
+                          <td>{ticket.serialNumber || '-'}</td>
+                          <td>
+                            <span className="meta-category">{ticket.category}</span>
+                          </td>
+                          <td>
+                            {ticket.createdBy ? (
+                              <span className="admin-name-table">👤 {ticket.createdBy}</span>
+                            ) : (
+                              <span className="admin-name-table unknown">Unknown</span>
+                            )}
+                          </td>
+                          <td>
+                            <div 
+                              className="priority-tag-small"
+                              style={{ backgroundColor: getPriorityColor(ticket.priority) }}
+                            >
+                              {ticket.priority}
+                            </div>
+                          </td>
+                          <td>
+                            <div 
+                              className="status-badge-small" 
+                              style={{ backgroundColor: getStatusColor(ticket.status) }}
+                            >
+                              <span className="status-icon">{getStatusIcon(ticket.status)}</span>
+                              {ticket.status}
+                            </div>
+                          </td>
+                          <td>{ticket.subOption || ticket.assignedTo || 'Unassigned'}</td>
+                          <td>
+                            {new Date(ticket.createdAt).toLocaleDateString('en-GB', { 
+                              day: '2-digit', 
+                              month: '2-digit', 
+                              year: 'numeric' 
+                            })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
           ) : (
             <div className="empty-state">
               <div className="empty-icon">🎫</div>

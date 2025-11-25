@@ -21,6 +21,7 @@ const TechnicianPortal = () => {
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [selectedDate, setSelectedDate] = useState("");
   const [isLoadingTickets, setIsLoadingTickets] = useState(true);
+  const [viewMode, setViewMode] = useState("grid"); // "grid" or "table"
 
   useEffect(() => {
     // Fetch technicians
@@ -326,6 +327,26 @@ const TechnicianPortal = () => {
         <div className="tickets-header">
           <div className="header-main">
             <h2>My Assigned Tickets ({techTickets.length})</h2>
+            
+            <div className="view-toggle-section">
+              <label className="filter-label">View:</label>
+              <div className="view-toggle-buttons">
+                <button
+                  className={`view-toggle-btn ${viewMode === "grid" ? "active" : ""}`}
+                  onClick={() => setViewMode("grid")}
+                >
+                  <span className="view-icon">⊞</span>
+                  Grid
+                </button>
+                <button
+                  className={`view-toggle-btn ${viewMode === "table" ? "active" : ""}`}
+                  onClick={() => setViewMode("table")}
+                >
+                  <span className="view-icon">☰</span>
+                  Table
+                </button>
+              </div>
+            </div>
           </div>
           
           <div className="filter-buttons-container">
@@ -393,6 +414,7 @@ const TechnicianPortal = () => {
         </div>
 
         {techTickets.length > 0 ? (
+          viewMode === "grid" ? (
           <div className="tickets-grid">
             {techTickets.map(ticket => (
               <div key={ticket.id} className="ticket-card">
@@ -409,12 +431,6 @@ const TechnicianPortal = () => {
                     <span className="label">Product</span>
                     <span className="value">{ticket.productName}</span>
                   </div>
-                  {ticket.issueType && (
-                    <div className="ticket-row">
-                      <span className="label">Issue Type</span>
-                      <span className="value">{ticket.issueType}</span>
-                    </div>
-                  )}
                   {ticket.serviceAmount && (
                     <div className="ticket-row">
                       <span className="label">Service Amount</span>
@@ -483,6 +499,72 @@ const TechnicianPortal = () => {
               </div>
             ))}
           </div>
+          ) : (
+            <div className="tickets-table-container">
+              <div className="table-responsive">
+                <table className="tickets-table">
+                  <thead>
+                    <tr>
+                      <th>Ticket #</th>
+                      <th>Customer</th>
+                      <th>Product</th>
+                      <th>Category</th>
+                      <th>Priority</th>
+                      <th>Status</th>
+                      <th>Service Amount</th>
+                      <th>Commission</th>
+                      <th>Start Date</th>
+                      <th>End Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {techTickets.map(ticket => (
+                      <tr key={ticket.id}>
+                        <td className="ticket-number-cell">#{ticket.ticketNumber || ticket.id.substring(0, 8)}</td>
+                        <td>{ticket.customerName}</td>
+                        <td>{ticket.productName}</td>
+                        <td>
+                          <span className="category-badge">{ticket.category}</span>
+                        </td>
+                        <td>
+                          <span className={`priority-badge ${ticket.priority?.toLowerCase()}`}>
+                            {ticket.priority}
+                          </span>
+                        </td>
+                        <td>
+                          <span className={`ticket-status ${ticket.status}`}>
+                            {ticket.status}
+                          </span>
+                        </td>
+                        <td>{ticket.serviceAmount ? `₹${parseFloat(ticket.serviceAmount).toLocaleString()}` : '-'}</td>
+                        <td>{ticket.commissionAmount ? `₹${parseFloat(ticket.commissionAmount).toLocaleString()}` : '-'}</td>
+                        <td>
+                          {ticket.createdAt 
+                            ? new Date(ticket.createdAt).toLocaleDateString('en-GB', { 
+                                day: '2-digit', 
+                                month: '2-digit', 
+                                year: 'numeric' 
+                              })
+                            : 'Not set'
+                          }
+                        </td>
+                        <td>
+                          {ticket.endDate 
+                            ? new Date(ticket.endDate).toLocaleDateString('en-GB', { 
+                                day: '2-digit', 
+                                month: '2-digit', 
+                                year: 'numeric' 
+                              })
+                            : 'Not set'
+                          }
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )
         ) : (
           <div className="empty-state">
             <p>No tickets assigned yet</p>

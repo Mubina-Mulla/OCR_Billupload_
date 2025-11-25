@@ -21,6 +21,7 @@ const ServiceCenter = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null, name: '' });
   const { notification, showNotification, hideNotification } = useNotification();
+  const [viewMode, setViewMode] = useState("grid"); // "grid" or "table"
   
   // Get selected service from URL
   const selectedService = serviceId ? services.find(s => s.id === serviceId) : null;
@@ -187,8 +188,34 @@ const ServiceCenter = () => {
         </div>
 
         <div className="tickets-section">
-          <h2>Assigned Tickets ({serviceTickets.length})</h2>
+          <div className="tickets-header">
+            <div className="header-main">
+              <h2>Assigned Tickets ({serviceTickets.length})</h2>
+              
+              <div className="view-toggle-section">
+                <label className="filter-label">View:</label>
+                <div className="view-toggle-buttons">
+                  <button
+                    className={`view-toggle-btn ${viewMode === "grid" ? "active" : ""}`}
+                    onClick={() => setViewMode("grid")}
+                  >
+                    <span className="view-icon">⊞</span>
+                    Grid
+                  </button>
+                  <button
+                    className={`view-toggle-btn ${viewMode === "table" ? "active" : ""}`}
+                    onClick={() => setViewMode("table")}
+                  >
+                    <span className="view-icon">☰</span>
+                    Table
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          
           {serviceTickets.length > 0 ? (
+            viewMode === "grid" ? (
             <div className="tickets-grid">
               {serviceTickets.map(ticket => (
                 <div 
@@ -215,12 +242,6 @@ const ServiceCenter = () => {
                         <span className="info-label">Product</span>
                         <span className="info-value">{ticket.productName}</span>
                       </div>
-                      {ticket.issueType && (
-                        <div className="info-row">
-                          <span className="info-label">Issue Type</span>
-                          <span className="info-value">{ticket.issueType}</span>
-                        </div>
-                      )}
                     </div>
 
                     <div className="meta-section">
@@ -247,6 +268,57 @@ const ServiceCenter = () => {
                 </div>
               ))}
             </div>
+            ) : (
+              <div className="tickets-table-container">
+                <div className="table-responsive">
+                  <table className="tickets-table">
+                    <thead>
+                      <tr>
+                        <th>Ticket #</th>
+                        <th>Customer</th>
+                        <th>Product</th>
+                        <th>Category</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Assigned To</th>
+                        <th>Created Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {serviceTickets.map(ticket => (
+                        <tr key={ticket.id}>
+                          <td className="ticket-number-cell">#{ticket.ticketNumber}</td>
+                          <td>{ticket.customerName}</td>
+                          <td>{ticket.productName}</td>
+                          <td>
+                            <span className="meta-category">{ticket.category || 'Service'}</span>
+                          </td>
+                          <td>
+                            <div className="priority-tag priority-medium-tag">
+                              {ticket.priority?.toUpperCase() || 'MEDIUM'}
+                            </div>
+                          </td>
+                          <td>
+                            <div className="status-badge status-pending">
+                              <span className="status-icon">⏳</span>
+                              {ticket.status || 'Pending'}
+                            </div>
+                          </td>
+                          <td>{ticket.subOption || "Unassigned"}</td>
+                          <td>
+                            {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('en-GB', { 
+                              day: '2-digit', 
+                              month: '2-digit', 
+                              year: 'numeric' 
+                            }) : 'N/A'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
           ) : (
             <div className="empty-state">
               <p>No tickets assigned to this service center yet.</p>

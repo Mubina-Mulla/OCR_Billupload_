@@ -26,12 +26,7 @@ const AddTicket = ({
     return Math.floor(100000000 + Math.random() * 900000000).toString();
   };
 
-  const issueTypes = {
-    Demo: ["Product Demonstration", "Setup Assistance", "Training", "Technical Overview"],
-    Service: ["Repair", "Maintenance", "Calibration", "Diagnostic", "Parts Replacement"],
-    "Third Party": ["Warranty Claim", "External Repair", "Vendor Service", "Collaborative Fix"],
-    "In Store": ["Quick Fix", "Assessment", "Minor Repair", "Consultation"],
-  };
+
 
   const [formData, setFormData] = useState({
     ticketNumber: generateTicketNumber(),
@@ -49,7 +44,6 @@ const AddTicket = ({
     model: prefilledData?.model || productData?.model || "",
     price: prefilledData?.price || productData?.price || "",
     category: "Demo",
-    issueType: "",
     subOption: "",
     priority: "Medium",
     status: "Pending",
@@ -198,7 +192,6 @@ const AddTicket = ({
       setFormData((prev) => ({
         ...prev,
         [name]: value,
-        issueType: "",
         subOption: "",
         serviceAmount: "",
         commissionAmount: "",
@@ -214,10 +207,6 @@ const AddTicket = ({
 
     if (!formData.customerName) {
       showNotification("Please enter customer name", "warning");
-      return;
-    }
-    if (!formData.issueType) {
-      showNotification("Please select an issue type", "warning");
       return;
     }
     if (!formData.subOption || formData.subOption === "__new__") {
@@ -481,23 +470,6 @@ const AddTicket = ({
                   <option value="Service">Service</option>
                   <option value="Third Party">Third Party</option>
                   <option value="In Store">In Store</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Issue Type</label>
-                <select
-                  name="issueType"
-                  value={formData.issueType}
-                  onChange={handleChange}
-                  required
-                >
-                  <option value="">Select Issue Type</option>
-                  {issueTypes[formData.category]?.map((issue, index) => (
-                    <option key={index} value={issue}>
-                      {issue}
-                    </option>
-                  ))}
                 </select>
               </div>
 
