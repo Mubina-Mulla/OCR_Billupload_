@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import Tickets from './Tickets';
+import AddInStockProduct from './AddInStockProduct';
 import './Dashboard.css';
 
 const Dashboard = () => {
   const [filterCategory, setFilterCategory] = useState(null);
   const [activeFilter, setActiveFilter] = useState(null);
   const [showTickets, setShowTickets] = useState(true); // Show tickets by default
+  const [showInStockForm, setShowInStockForm] = useState(false);
   const excludeResolved = true; // Dashboard should not show resolved tickets
 
   const sections = [
@@ -26,12 +28,28 @@ const Dashboard = () => {
       setActiveFilter(categoryName); // Activate card
     }
     setShowTickets(true); // Keep tickets visible
+    setShowInStockForm(false); // Hide form when switching categories
   };
 
   const clearFilter = () => {
     setFilterCategory(null);
     setActiveFilter(null);
     setShowTickets(true); // Keep tickets visible
+    setShowInStockForm(false);
+  };
+
+  const handleBackFromInStock = () => {
+    setShowInStockForm(false);
+    setFilterCategory('in stock');
+    setActiveFilter('in stock');
+    setShowTickets(true);
+  };
+
+  const handleInStockProductAdded = () => {
+    setShowInStockForm(false);
+    setFilterCategory('in stock');
+    setActiveFilter('in stock');
+    setShowTickets(true);
   };
 
   return (
@@ -52,25 +70,53 @@ const Dashboard = () => {
         ))}
       </div>
 
-      {/* Tickets Section - Always visible below category cards */}
+      {/* In Stock Form or Tickets Section */}
       <div style={{ marginTop: "30px" }}>
-        {filterCategory ? (
-          <>
-            <div style={{ marginBottom: "20px", textAlign: "center" }}>
-              <h2 style={{ fontSize: "1.5rem", fontWeight: "600", color: "#2c3e50" }}>
-                {sections.find(s => s.name === filterCategory)?.label} Tickets
-              </h2>
-            </div>
-            <Tickets filterCategory={filterCategory} excludeResolved={excludeResolved} />
-          </>
+        {showInStockForm ? (
+          <AddInStockProduct 
+            onBack={handleBackFromInStock}
+            onProductAdded={handleInStockProductAdded}
+          />
         ) : (
           <>
-            <div style={{ marginBottom: "20px", textAlign: "center" }}>
-              <h2 style={{ fontSize: "1.5rem", fontWeight: "600", color: "#2c3e50" }}>
-                All Tickets
+            <div style={{ 
+              marginBottom: "20px", 
+              display: "flex", 
+              justifyContent: "space-between", 
+              alignItems: "center",
+              gap: "15px",
+              flexWrap: "wrap"
+            }}>
+              <h2 style={{ fontSize: "1.5rem", fontWeight: "600", color: "#2c3e50", margin: 0 }}>
+                {filterCategory ? sections.find(s => s.name === filterCategory)?.label + ' Tickets' : 'All Tickets'}
               </h2>
+              {filterCategory === 'in stock' && (
+                <button 
+                  className="btn-primary"
+                  onClick={() => {
+                    setShowInStockForm(true);
+                    setShowTickets(false);
+                  }}
+                  style={{ 
+                    padding: "8px 16px", 
+                    fontSize: "0.95rem",
+                    whiteSpace: "nowrap",
+                    borderRadius: "6px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    fontWeight: "500",
+                    width: "auto",
+                    minWidth: "fit-content",
+                    maxWidth: "220px"
+                  }}
+                >
+                  <span style={{ fontSize: "1.1rem", fontWeight: "400" }}>+</span>
+                  Add Defective Product
+                </button>
+              )}
             </div>
-            <Tickets filterCategory={null} excludeResolved={excludeResolved} />
+            <Tickets key="tickets-main" filterCategory={filterCategory} excludeResolved={excludeResolved} />
           </>
         )}
       </div>

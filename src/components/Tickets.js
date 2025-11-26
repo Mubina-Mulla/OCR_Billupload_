@@ -8,8 +8,13 @@ import useNotification from '../hooks/useNotification';
 import Loader from './Loader';
 import "./Tickets.css";
 
+// Cache tickets globally to avoid reloading
+let cachedTickets = [];
+let lastLoadTime = 0;
+const CACHE_DURATION = 30000; // 30 seconds
+
 const Tickets = ({ filterCategory, excludeResolved = false }) => {
-  const [allTickets, setAllTickets] = useState([]); // All tickets from database
+  const [allTickets, setAllTickets] = useState(cachedTickets); // Start with cached tickets
   const [displayedTickets, setDisplayedTickets] = useState([]); // Only tickets to show (9 at a time)
   const [currentBatch, setCurrentBatch] = useState(0); // Current batch number (0, 1, 2...)
   const [searchTerm, setSearchTerm] = useState("");
@@ -19,7 +24,7 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
   const [technicians, setTechnicians] = useState([]);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, type: '', ticketId: null });
   const [viewMode, setViewMode] = useState("grid"); // "grid" or "table"
-  const [isLoading, setIsLoading] = useState(true); // Start with true for initial load
+  const [isLoading, setIsLoading] = useState(cachedTickets.length === 0); // Only show loading if no cache
   const [loadingMore, setLoadingMore] = useState(false); // Loading next batch
   const BATCH_SIZE = 9; // Show 9 tickets per batch
   const { notification, showNotification, hideNotification } = useNotification();
@@ -39,6 +44,7 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
       const adminData = JSON.parse(currentAdmin);
       const userId = adminData?.uid;  // ✅ FIXED
       console.log('🆔 Tickets.js - Extracted user ID from currentAdmin:', userId);
+      console.log('🆔 Type:', typeof userId);
       return userId;
     }
 
@@ -46,6 +52,7 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
       const adminData = JSON.parse(superAdmin);
       const userId = adminData?.uid;  // ✅ FIXED
       console.log('🆔 Tickets.js - Extracted user ID from superAdmin:', userId);
+      console.log('🆔 Type:', typeof userId);
       return userId;
     }
 
@@ -59,173 +66,126 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
 
 
   // Load tickets from all admin collections for ticket management view
-  const loadAllTickets = async () => {
-    // Prevent multiple simultaneous calls
-    if (isLoading) {
-      console.log('⏸️ Tickets.js: Already loading, skipping duplicate call');
-      return;
-    }
-    
+  const loadAllTickets = async (forceReload = false) => {
     try {
+      // Check if we have cached tickets and they're still fresh
+      const now = Date.now();
+      if (!forceReload && cachedTickets.length > 0 && (now - lastLoadTime) < CACHE_DURATION) {
+        console.log('✅ Using cached tickets');
+        setAllTickets(cachedTickets);
+        setDisplayedTickets(cachedTickets.slice(0, BATCH_SIZE));
+        setCurrentBatch(0);
+        const categories = [...new Set(cachedTickets.map(t => t.category).filter(Boolean))];
+        setAllCategories(categories);
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('📥 Loading fresh tickets...');
       setIsLoading(true);
-      console.log('🎯 Tickets.js: Loading tickets from all admins...');
-      console.log('🔍 Tickets.js: Using path - mainData/Billuload/users');
       
       const usersRef = getCollectionRef("users");
-      console.log('📂 Tickets.js: Users collection reference created');
-      
       const usersSnapshot = await getDocs(usersRef);
-      console.log(`👥 Tickets.js: Found ${usersSnapshot.docs.length} users in database`);
       
       const allTickets = [];
-      const seenTicketIds = new Set(); // Track seen ticket IDs to prevent duplicates
+      const seenTicketIds = new Set();
+      
+      // Fetch tickets from users
+      const ticketPromises = usersSnapshot.docs.map(async (userDoc) => {
+        const userData = userDoc.data();
+        const userTicketsRef = collection(db, 'mainData', 'Billuload', 'users', userDoc.id, 'tickets');
+        const ticketsSnapshot = await getDocs(userTicketsRef);
         
-        for (const userDoc of usersSnapshot.docs) {
-          const userData = userDoc.data();
-          console.log(`📂 Tickets.js: Checking user ${userDoc.id}`);
-          console.log(`   Email: ${userData.email || 'no email'}`);
-          console.log(`   Name: ${userData.name || userData.adminName || 'no name'}`);
+        const userTickets = [];
+        ticketsSnapshot.docs.forEach(ticketDoc => {
+          const ticketData = ticketDoc.data();
+          const ticketIdentifier = ticketData.ticketNumber || ticketDoc.id;
           
-          const ticketsPath = `mainData/Billuload/users/${userDoc.id}/tickets`;
-          console.log(`   🔍 Checking path: ${ticketsPath}`);
-          
-          const userTicketsRef = collection(db, 'mainData', 'Billuload', 'users', userDoc.id, 'tickets');
-          const ticketsSnapshot = await getDocs(userTicketsRef);
-          
-          console.log(`🎫 Tickets.js: Found ${ticketsSnapshot.docs.length} tickets for user ${userDoc.id}`);
-          
-          if (ticketsSnapshot.docs.length > 0) {
-            console.log(`   📋 Ticket details for ${userData.email || userDoc.id}:`);
-            ticketsSnapshot.docs.forEach((doc, index) => {
-              const data = doc.data();
-              console.log(`      ${index + 1}. Ticket #${data.ticketNumber} - ${data.customerName} - ${data.status} - Created by: ${data.createdBy || 'Unknown'}`);
+          if (!seenTicketIds.has(ticketIdentifier)) {
+            seenTicketIds.add(ticketIdentifier);
+            userTickets.push({
+              id: ticketDoc.id,
+              userId: userDoc.id,
+              userEmail: userData.email,
+              userName: userData.name,
+              ...ticketData
             });
-          } else {
-            console.log(`   ⚠️ No tickets found at path: ${ticketsPath}`);
           }
-          
-          ticketsSnapshot.docs.forEach(ticketDoc => {
-            const ticketData = ticketDoc.data();
-            // Only add ticket if we haven't seen this ticket number before (more reliable than ID)
-            const ticketIdentifier = ticketData.ticketNumber || ticketDoc.id;
-            
-            if (!seenTicketIds.has(ticketIdentifier)) {
-              seenTicketIds.add(ticketIdentifier);
-              const ticket = {
-                id: ticketDoc.id,
-                userId: userDoc.id,
-                userEmail: userData.email,
-                userName: userData.name,
-                ...ticketData
-              };
-              allTickets.push(ticket);
-              console.log(`✅ Tickets.js: Added ticket #${ticketData.ticketNumber} from ${userData.email || userDoc.id}`);
-            } else {
-              console.log('⚠️ Tickets.js: Skipping duplicate ticket:', {
-                id: ticketDoc.id,
-                ticketNumber: ticketData.ticketNumber,
-                userId: userDoc.id,
-                userEmail: userData.email
-              });
-            }
+        });
+        
+        return userTickets;
+      });
+      
+      const ticketArrays = await Promise.all(ticketPromises);
+      
+      ticketArrays.forEach(tickets => {
+        allTickets.push(...tickets);
+      });
+      
+      // Also fetch In Stock tickets from dedicated collection
+      const inStockRef = collection(db, 'mainData', 'Billuload', 'inStock');
+      const inStockSnapshot = await getDocs(inStockRef);
+      
+      inStockSnapshot.docs.forEach(ticketDoc => {
+        const ticketData = ticketDoc.data();
+        const ticketIdentifier = ticketData.ticketNumber || ticketDoc.id;
+        
+        if (!seenTicketIds.has(ticketIdentifier)) {
+          seenTicketIds.add(ticketIdentifier);
+          allTickets.push({
+            id: ticketDoc.id,
+            ...ticketData
           });
         }
-        
-      console.log(`🎯 Tickets.js: Loaded ${allTickets.length} unique tickets from ${usersSnapshot.docs.length} admins`);
-      console.log('📊 Tickets.js: All tickets array:', allTickets.map(t => ({
-        ticketNumber: t.ticketNumber,
-        customer: t.customerName,
-        createdBy: t.createdBy,
-        status: t.status
-      })));
+      });
+      
+      // Sort by creation date (newest first)
+      allTickets.sort((a, b) => {
+        const dateA = new Date(a.createdAt || 0);
+        const dateB = new Date(b.createdAt || 0);
+        return dateB - dateA;
+      });
+      
+      console.log(`✅ Loaded ${allTickets.length} tickets`);
+      
+      // Update cache
+      cachedTickets = allTickets;
+      lastLoadTime = Date.now();
       
       setAllTickets(allTickets);
-      setDisplayedTickets(allTickets.slice(0, BATCH_SIZE)); // Show first 9 tickets
+      setDisplayedTickets(allTickets.slice(0, BATCH_SIZE));
       setCurrentBatch(0);
-      console.log('✅ Tickets.js: State updated with tickets');
       
-      // Extract categories from all tickets
       const categories = [...new Set(allTickets.map(t => t.category).filter(Boolean))];
       setAllCategories(categories);
+      
       setIsLoading(false);
     } catch (error) {
       console.error("❌ Error loading tickets:", error);
       setIsLoading(false);
-      
-      // Check if it's a network error
-      const isNetworkError = error.message?.includes('network') || 
-                            error.message?.includes('Failed to fetch') ||
-                            error.code === 'unavailable';
-      
-      if (isNetworkError) {
-        showNotification('Network error. Please check your internet connection and try again.', 'error');
-      } else {
-        showNotification('Error loading tickets. Please try again.', 'error');
-      }
-      // Fallback to current user's tickets only
-      const currentUserId = getCurrentUserId();
-      if (currentUserId) {
-        const userTicketsRef = getAdminTicketsCollectionRef(currentUserId);
-        const unsubscribe = onSnapshot(userTicketsRef, (snapshot) => {
-          const ticketsArray = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data(),
-          }));
-          setAllTickets(ticketsArray);
-          setDisplayedTickets(ticketsArray.slice(0, BATCH_SIZE)); // Show first 9 tickets
-          setCurrentBatch(0);
-          
-          // Extract categories from tickets
-          const categories = [...new Set(ticketsArray.map(t => t.category).filter(Boolean))];
-          setAllCategories(categories);
-        });
-        return unsubscribe;
-      }
+      setAllTickets([]);
+      setDisplayedTickets([]);
+      showNotification('Error loading tickets. Please try again.', 'error');
     }
   };
 
   // Load all tickets initially
   useEffect(() => {
-    console.log('🚀 Loading all tickets...');
-    
-    let unsubscribe = null;
-    
-    try {
-      // Use optimized collectionGroup subscription for real-time updates
-      unsubscribe = subscribeTickets(
-        { pageSize: 100 }, // Load all tickets
-        (tickets) => {
-          console.log(`✅ Received ${tickets.length} tickets from database`);
-          setAllTickets(tickets);
-          
-          // Show only first 9 tickets (first batch)
-          setDisplayedTickets(tickets.slice(0, BATCH_SIZE));
-          setCurrentBatch(0);
-          
-          // Extract categories
-          const categories = [...new Set(tickets.map(t => t.category).filter(Boolean))];
-          setAllCategories(categories);
-          
-          setIsLoading(false);
-        }
-      );
-    } catch (error) {
-      console.error('Error setting up ticket subscription:', error);
+    // If we have cached tickets, use them immediately
+    if (cachedTickets.length > 0) {
+      console.log('✅ Using cached tickets on mount');
+      setAllTickets(cachedTickets);
+      setDisplayedTickets(cachedTickets.slice(0, BATCH_SIZE));
+      const categories = [...new Set(cachedTickets.map(t => t.category).filter(Boolean))];
+      setAllCategories(categories);
       setIsLoading(false);
-      // Fallback to loading tickets without real-time updates
+    } else {
+      console.log('🚀 Loading tickets for first time...');
       loadAllTickets();
     }
     
-    // Cleanup function to unsubscribe when component unmounts
     return () => {
-      if (unsubscribe) {
-        console.log('🔌 Unsubscribing from ticket updates...');
-        try {
-          unsubscribe();
-        } catch (error) {
-          console.error('Error unsubscribing:', error);
-        }
-      }
+      console.log('🔌 Tickets component unmounting...');
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
@@ -256,11 +216,14 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
   // Scroll listener for auto-loading next batch
   useEffect(() => {
     const handleScroll = () => {
+      // Only trigger if there are actually more tickets to load
+      if (!hasMoreBatches() || loadingMore) {
+        return;
+      }
+      
       // Check if user scrolled near bottom (300px from bottom)
       if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 300) {
-        if (hasMoreBatches() && !loadingMore) {
-          loadNextBatch();
-        }
+        loadNextBatch();
       }
     };
     
@@ -285,7 +248,17 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
   const handleDelete = (id, userId) => {
     // Check if current admin is the one who created the ticket
     const currentUserId = getCurrentUserId();
-    if (currentUserId !== userId) {
+    console.log('🔍 handleDelete - Permission check:', {
+      currentUserId,
+      currentUserIdType: typeof currentUserId,
+      ticketUserId: userId,
+      ticketUserIdType: typeof userId,
+      strictMatch: currentUserId === userId,
+      looseMatch: currentUserId == userId
+    });
+    
+    // Only block if both IDs exist and don't match (using loose equality to handle string/number differences)
+    if (currentUserId && userId && currentUserId != userId) {
       showNotification('You are not authorized to delete this ticket. Only the admin who created it can make changes.', 'warning');
       return;
     }
@@ -325,7 +298,17 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
   const handleStatusChange = (id, newStatus, userId) => {
     // Check if current admin is the one who created the ticket
     const currentUserId = getCurrentUserId();
-    if (currentUserId !== userId) {
+    console.log('🔍 handleStatusChange - Permission check:', {
+      currentUserId,
+      currentUserIdType: typeof currentUserId,
+      ticketUserId: userId,
+      ticketUserIdType: typeof userId,
+      strictMatch: currentUserId === userId,
+      looseMatch: currentUserId == userId
+    });
+    
+    // Only block if both IDs exist and don't match (using loose equality to handle string/number differences)
+    if (currentUserId && userId && currentUserId != userId) {
       showNotification('You are not authorized to modify this ticket. Only the admin who created it can make changes.', 'warning');
       return;
     }
@@ -721,8 +704,8 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
           )}
         </div>
         
-        {/* Loading More Indicator */}
-        {loadingMore && (
+        {/* Loading More Indicator - Only show if there are actually more tickets */}
+        {loadingMore && hasMoreBatches() && (
           <div className="loading-more-indicator" style={{
             display: 'flex',
             justifyContent: 'center',
@@ -741,7 +724,7 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
               borderRadius: '50%',
               animation: 'spin 1s linear infinite'
             }}></div>
-            <span>Loading next 9 tickets...</span>
+            <span>Loading more tickets...</span>
           </div>
         )}
         
