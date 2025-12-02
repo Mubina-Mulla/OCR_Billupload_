@@ -19,7 +19,7 @@ const Notification = ({ message, type, isVisible, onClose, duration = 3000 }) =>
       case 'success':
         return '✅';
       case 'error':
-        return '❌';
+        return '⚠️';
       case 'warning':
         return '⚠️';
       case 'info':

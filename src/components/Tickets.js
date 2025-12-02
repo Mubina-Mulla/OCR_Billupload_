@@ -457,6 +457,20 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
 
   const handleSaveNote = async (ticketId, ticket) => {
     try {
+      // Check authorization
+      const currentUserId = getCurrentUserId();
+      if (!currentUserId) {
+        showNotification('Please login to make changes.', 'error');
+        return;
+      }
+      
+      // Only allow the creator to edit the ticket
+      if (ticket.userId && ticket.userId !== currentUserId) {
+        showNotification('You are not authorized to modify this ticket. Only the admin who created it can make changes.', 'error');
+        setEditingNote(prev => ({ ...prev, [ticketId]: false }));
+        return;
+      }
+      
       const newNote = noteValues[ticketId];
       
       // Determine if it's an In Stock ticket or regular ticket
@@ -496,7 +510,11 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       showNotification('Note updated successfully!', 'success');
     } catch (error) {
       console.error('Error updating note:', error);
-      showNotification('Error updating note. Please try again.', 'error');
+      if (error.code === 'permission-denied') {
+        showNotification('You are not authorized to modify this ticket. Only the admin who created it can make changes.', 'error');
+      } else {
+        showNotification('Error updating note. Please try again.', 'error');
+      }
     }
   };
 
@@ -526,6 +544,20 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
 
   const handleSaveTicket = async (ticketId, ticket) => {
     try {
+      // Check authorization
+      const currentUserId = getCurrentUserId();
+      if (!currentUserId) {
+        showNotification('Please login to make changes.', 'error');
+        return;
+      }
+      
+      // Only allow the creator to edit the ticket
+      if (ticket.userId && ticket.userId !== currentUserId) {
+        showNotification('You are not authorized to modify this ticket. Only the admin who created it can make changes.', 'error');
+        setEditingTicket(prev => ({ ...prev, [ticketId]: false }));
+        return;
+      }
+      
       const updatedFields = ticketEditValues[ticketId];
       
       let ticketRef;
@@ -562,7 +594,11 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       showNotification('Ticket updated successfully!', 'success');
     } catch (error) {
       console.error('Error updating ticket:', error);
-      showNotification('Error updating ticket. Please try again.', 'error');
+      if (error.code === 'permission-denied') {
+        showNotification('You are not authorized to modify this ticket. Only the admin who created it can make changes.', 'error');
+      } else {
+        showNotification('Error updating ticket. Please try again.', 'error');
+      }
     }
   };
 
