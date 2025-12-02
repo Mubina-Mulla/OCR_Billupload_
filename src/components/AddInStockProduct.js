@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { addDoc, collection } from 'firebase/firestore';
+import { addDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import Notification from './Notification';
 import useNotification from '../hooks/useNotification';
@@ -11,6 +11,7 @@ const AddInStockProduct = ({ onBack, onProductAdded }) => {
     productCode: '',
     brand: '',
     model: '',
+    callNo: '',
     defectType: '',
     quantity: '1',
     reportedBy: '',
@@ -84,10 +85,45 @@ const AddInStockProduct = ({ onBack, onProductAdded }) => {
     }
   };
 
-  const generateTicketNumber = () => {
-    const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000);
-    return `IS${timestamp}${random}`;
+  const generateTicketNumber = async () => {
+    try {
+      // Get current user ID
+      const userId = getCurrentUserId();
+      
+      if (!userId) {
+        console.error('No user ID found');
+        return "1";
+      }
+
+      // Query all tickets from the user's collection to find the highest ticket number
+      const ticketsRef = collection(db, 'mainData', 'Billuload', 'users', userId, 'tickets');
+      const ticketsSnapshot = await getDocs(ticketsRef);
+      
+      let maxTicketNumber = 0;
+      ticketsSnapshot.forEach((doc) => {
+        const ticketNum = parseInt(doc.data().ticketNumber);
+        if (!isNaN(ticketNum) && ticketNum > maxTicketNumber) {
+          maxTicketNumber = ticketNum;
+        }
+      });
+      
+      // Also check In Stock collection
+      const inStockRef = collection(db, 'mainData', 'Billuload', 'inStock');
+      const inStockSnapshot = await getDocs(inStockRef);
+      
+      inStockSnapshot.forEach((doc) => {
+        const ticketNum = parseInt(doc.data().ticketNumber);
+        if (!isNaN(ticketNum) && ticketNum > maxTicketNumber) {
+          maxTicketNumber = ticketNum;
+        }
+      });
+      
+      // Return next sequential number
+      return (maxTicketNumber + 1).toString();
+    } catch (error) {
+      console.error('Error generating ticket number:', error);
+      return Date.now().toString(); // Fallback to timestamp if error
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -106,15 +142,17 @@ const AddInStockProduct = ({ onBack, onProductAdded }) => {
         throw new Error('User not authenticated. Please login again.');
       }
 
+      const generatedTicketNumber = await generateTicketNumber();
+      
       const ticketData = {
-        ticketNumber: generateTicketNumber(),
+        ticketNumber: generatedTicketNumber,
         category: 'In Stock',
         status: 'Pending',
-        priority: 'Medium',
         productName: formData.productName,
         productCode: formData.productCode || 'N/A',
         brand: formData.brand || 'N/A',
         model: formData.model || 'N/A',
+        callNo: formData.callNo || generatedTicketNumber,
         defectType: formData.defectType,
         quantity: parseInt(formData.quantity) || 1,
         reportedBy: formData.reportedBy || getCurrentUserName(),
@@ -123,9 +161,7 @@ const AddInStockProduct = ({ onBack, onProductAdded }) => {
         createdAt: new Date().toISOString(),
         createdBy: getCurrentUserName(),
         userId: userId,
-        customerName: 'In Stock',
-        assignedTo: 'Warehouse',
-        subOption: 'Warehouse'
+        customerName: 'In Stock'
       };
 
       // Save to dedicated inStock collection at mainData/Billuload/inStock
@@ -207,6 +243,17 @@ const AddInStockProduct = ({ onBack, onProductAdded }) => {
                   value={formData.model}
                   onChange={handleInputChange}
                   placeholder="Enter model"
+                />
+              </div>
+
+              <div className="form-group">
+                <label style={{ opacity: 0.7 }}>Call No</label>
+                <input
+                  type="text"
+                  name="callNo"
+                  value={formData.callNo}
+                  onChange={handleInputChange}
+                  placeholder="Enter call number"
                 />
               </div>
             </div>

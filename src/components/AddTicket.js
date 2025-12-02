@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { addDoc, updateDoc, onSnapshot, setDoc, doc, collection } from "firebase/firestore";
+import { addDoc, updateDoc, onSnapshot, setDoc, doc, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import {
   db,
   getCollectionRef,
@@ -22,14 +22,59 @@ const AddTicket = ({
 }) => {
   const { notification, showNotification, hideNotification } = useNotification();
 
-  const generateTicketNumber = () => {
-    return Math.floor(100000000 + Math.random() * 900000000).toString();
+  const generateTicketNumber = async () => {
+    try {
+      // Get current user ID
+      const currentAdmin = localStorage.getItem('currentAdmin');
+      const superAdmin = localStorage.getItem('superAdmin');
+      let userId = null;
+      
+      if (currentAdmin) {
+        userId = JSON.parse(currentAdmin).uid;
+      } else if (superAdmin) {
+        userId = JSON.parse(superAdmin).uid;
+      }
+      
+      if (!userId) {
+        console.error('No user ID found');
+        return "1";
+      }
+
+      // Query all tickets from the user's collection to find the highest ticket number
+      const ticketsRef = collection(db, 'mainData', 'Billuload', 'users', userId, 'tickets');
+      const ticketsSnapshot = await getDocs(ticketsRef);
+      
+      let maxTicketNumber = 0;
+      ticketsSnapshot.forEach((doc) => {
+        const ticketNum = parseInt(doc.data().ticketNumber);
+        if (!isNaN(ticketNum) && ticketNum > maxTicketNumber) {
+          maxTicketNumber = ticketNum;
+        }
+      });
+      
+      // Also check In Stock collection
+      const inStockRef = collection(db, 'mainData', 'Billuload', 'inStock');
+      const inStockSnapshot = await getDocs(inStockRef);
+      
+      inStockSnapshot.forEach((doc) => {
+        const ticketNum = parseInt(doc.data().ticketNumber);
+        if (!isNaN(ticketNum) && ticketNum > maxTicketNumber) {
+          maxTicketNumber = ticketNum;
+        }
+      });
+      
+      // Return next sequential number
+      return (maxTicketNumber + 1).toString();
+    } catch (error) {
+      console.error('Error generating ticket number:', error);
+      return Date.now().toString(); // Fallback to timestamp if error
+    }
   };
 
 
 
   const [formData, setFormData] = useState({
-    ticketNumber: generateTicketNumber(),
+    ticketNumber: "...", // Will be set by useEffect
     customerName: prefilledData?.customerName || customer?.name || "",
     customerPhone: prefilledData?.customerPhone || customer?.phone || "",
     productName: prefilledData?.productName || productData?.name || "",
@@ -45,7 +90,6 @@ const AddTicket = ({
     price: prefilledData?.price || productData?.price || "",
     category: "Demo",
     subOption: "",
-    priority: "Medium",
     status: "Pending",
     serviceAmount: "",
     commissionAmount: "",
@@ -60,6 +104,20 @@ const AddTicket = ({
   const [technicians, setTechnicians] = useState([]);
   const [adminDisplayName, setAdminDisplayName] = useState("");
   const receivedOptions = ["By Store", "By Technician"];
+
+  // Generate ticket number on component mount
+  useEffect(() => {
+    const initTicketNumber = async () => {
+      if (!ticketData) { // Only generate for new tickets
+        const newTicketNumber = await generateTicketNumber();
+        setFormData(prev => ({
+          ...prev,
+          ticketNumber: newTicketNumber
+        }));
+      }
+    };
+    initTicketNumber();
+  }, []);
 
   const getCurrentAdminInfo = () => {
     try {
@@ -470,15 +528,6 @@ const AddTicket = ({
                   <option value="Service">Service</option>
                   <option value="Third Party">Third Party</option>
                   <option value="In Store">In Store</option>
-                </select>
-              </div>
-
-              <div className="form-group">
-                <label>Priority</label>
-                <select name="priority" value={formData.priority} onChange={handleChange}>
-                  <option value="High">High</option>
-                  <option value="Medium">Medium</option>
-                  <option value="Low">Low</option>
                 </select>
               </div>
 

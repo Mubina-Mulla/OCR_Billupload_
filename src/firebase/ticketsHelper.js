@@ -51,13 +51,11 @@ export const fetchTicketsOptimized = async (options = {}) => {
     
     if (status) {
       constraints.push(where('status', '==', status));
-    }
-    
-    // Order by creation date (newest first) and limit results
-    constraints.push(orderBy('createdAt', 'desc'));
-    constraints.push(limit(pageSize));
-    
-    // Build final query
+  }
+
+  // Order by creation date (oldest first) and limit results
+  constraints.push(orderBy('createdAt', 'asc'));
+  constraints.push(limit(pageSize));    // Build final query
     ticketsQuery = query(ticketsQuery, ...constraints);
     
     // Execute query
@@ -120,12 +118,10 @@ export const subscribeTickets = (options = {}, onUpdate) => {
     if (status) {
       constraints.push(where('status', '==', status));
     }
-    
-    // Order by creation date and limit
-    constraints.push(orderBy('createdAt', 'desc'));
-    constraints.push(limit(pageSize));
-    
-    // Build final query
+
+    // Order by creation date (oldest first) and limit
+    constraints.push(orderBy('createdAt', 'asc'));
+    constraints.push(limit(pageSize));    // Build final query
     ticketsQuery = query(ticketsQuery, ...constraints);
     
     // Set up real-time listener
@@ -170,10 +166,10 @@ export const fetchAllTickets = async (pageSize = 100) => {
   try {
     console.log('🚀 Fetching all tickets with pagination...');
     
-    // Simple query to get recent tickets
+    // Simple query to get tickets (oldest first)
     const ticketsQuery = query(
       collectionGroup(db, 'tickets'),
-      orderBy('createdAt', 'desc'),
+      orderBy('createdAt', 'asc'),
       limit(pageSize)
     );
     

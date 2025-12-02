@@ -450,15 +450,6 @@ const TechnicianPortal = () => {
                     </div>
                   )}
                   
-                  {ticket.priority && (
-                    <div className="ticket-row">
-                      <span className="label">Priority</span>
-                      <div className="priority-container">
-                        <span className={`priority-badge ${ticket.priority.toLowerCase()}`}>{ticket.priority}</span>
-                      </div>
-                    </div>
-                  )}
-                  
                   <div className="ticket-row date-info">
                     <span className="label">Start</span>
                     <span className="value start-date">
@@ -509,7 +500,6 @@ const TechnicianPortal = () => {
                       <th>Customer</th>
                       <th>Product</th>
                       <th>Category</th>
-                      <th>Priority</th>
                       <th>Status</th>
                       <th>Service Amount</th>
                       <th>Commission</th>
@@ -525,11 +515,6 @@ const TechnicianPortal = () => {
                         <td>{ticket.productName}</td>
                         <td>
                           <span className="category-badge">{ticket.category}</span>
-                        </td>
-                        <td>
-                          <span className={`priority-badge ${ticket.priority?.toLowerCase()}`}>
-                            {ticket.priority}
-                          </span>
                         </td>
                         <td>
                           <span className={`ticket-status ${ticket.status}`}>

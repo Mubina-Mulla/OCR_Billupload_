@@ -558,16 +558,6 @@ const Technicians = () => {
 
                       <div className="meta-section">
                         <div className="priority-info">
-                          <span className="meta-label">PRIORITY</span>
-                          <div 
-                            className="priority-tag"
-                            style={{ 
-                              backgroundColor: isResolved ? "#10b981" : getPriorityColor(ticket.priority),
-                              color: 'white'
-                            }}
-                          >
-                            {isResolved ? "COMPLETED" : (ticket.priority?.toUpperCase() || 'MEDIUM')}
-                          </div>
                           <div className="meta-dates">
                             <div className="start-date">
                               <span className="date-label">Start:</span>
@@ -615,7 +605,6 @@ const Technicians = () => {
                         <th>Product</th>
                         <th>Category</th>
                         <th>Created By</th>
-                        <th>Priority</th>
                         <th>Status</th>
                         <th>Service Amount</th>
                         <th>Commission</th>
@@ -669,17 +658,6 @@ const Technicians = () => {
                               ) : (
                                 <span className="admin-name-table unknown">Unknown</span>
                               )}
-                            </td>
-                            <td>
-                              <div 
-                                className="priority-tag-small"
-                                style={{ 
-                                  backgroundColor: isResolved ? "#10b981" : getPriorityColor(ticket.priority),
-                                  color: 'white'
-                                }}
-                              >
-                                {isResolved ? "COMPLETED" : (ticket.priority?.toUpperCase() || 'MEDIUM')}
-                              </div>
                             </td>
                             <td>
                               <div 
@@ -772,33 +750,31 @@ const Technicians = () => {
       </div>
 
       {/* 🔍 Search Section */}
-      <div className="search-section">
+      <div className="search-bar-section">
         <div className="search-container">
-          <div className="search-box">
-            <span className="search-icon">🔍</span>
-            <input
-              type="text"
-              placeholder="Search by name, phone, skills, or address..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="search-input"
-            />
-            {searchTerm && (
-              <button className="clear-search" onClick={() => setSearchTerm("")}>
-                ✕
-              </button>
-            )}
-          </div>
-          {searchTerm && (
-            <div className="search-stats">
-              <span>
-                Found {filteredTechs.length} technician
-                {filteredTechs.length !== 1 ? "s" : ""}
-              </span>
-            </div>
-          )}
+          <span className="search-icon">🔍</span>
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Search by name, phone, skills, or address..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
+        {searchTerm && (
+          <button className="clear-search-btn" onClick={() => setSearchTerm("")}>
+            ✕
+          </button>
+        )}
       </div>
+      {searchTerm && (
+        <div className="search-stats">
+          <span>
+            Found {filteredTechs.length} technician
+              {filteredTechs.length !== 1 ? "s" : ""}
+            </span>
+        </div>
+      )}
 
       <div className="services-container">
         {filteredTechs.length > 0 ? (

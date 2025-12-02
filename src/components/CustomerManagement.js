@@ -462,7 +462,7 @@ const CustomerManagement = () => {
             viewMode === "grid" ? (
             <div className="tickets-grid">
               {productTickets.map(ticket => (
-                <div key={ticket.id} className={`ticket-card priority-${ticket.priority?.toLowerCase() || "medium"}`}>
+                <div key={ticket.id} className="ticket-card">
                   <div className="ticket-header">
                     <div className="header-top">
                       <h3 className="ticket-number">#{ticket.ticketNumber}</h3>
@@ -502,13 +502,6 @@ const CustomerManagement = () => {
 
                     <div className="meta-section">
                       <div className="priority-info">
-                        <span className="meta-label">Priority</span>
-                        <div 
-                          className="priority-tag"
-                          style={{ backgroundColor: getPriorityColor(ticket.priority) }}
-                        >
-                          {ticket.priority}
-                        </div>
                         <span className="meta-date">
                           {new Date(ticket.createdAt).toLocaleDateString('en-GB', { 
                             day: '2-digit', 
@@ -539,7 +532,6 @@ const CustomerManagement = () => {
                         <th>Serial Number</th>
                         <th>Category</th>
                         <th>Created By</th>
-                        <th>Priority</th>
                         <th>Status</th>
                         <th>Assigned To</th>
                         <th>Created Date</th>
@@ -561,14 +553,6 @@ const CustomerManagement = () => {
                             ) : (
                               <span className="admin-name-table unknown">Unknown</span>
                             )}
-                          </td>
-                          <td>
-                            <div 
-                              className="priority-tag-small"
-                              style={{ backgroundColor: getPriorityColor(ticket.priority) }}
-                            >
-                              {ticket.priority}
-                            </div>
                           </td>
                           <td>
                             <div 
@@ -807,25 +791,25 @@ const CustomerManagement = () => {
       </div>
 
       {/* Search Section */}
-      <div className="search-section">
-        <div className="search-box">
+      <div className="search-bar-section">
+        <div className="search-container">
           <span className="search-icon">🔍</span>
           <input
             type="text"
+            className="search-input"
             placeholder="Search customers..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
           />
-          {searchTerm && (
-            <button 
-              className="clear-search"
-              onClick={() => setSearchTerm('')}
-            >
-              ✕
-            </button>
-          )}
         </div>
+        {searchTerm && (
+          <button 
+            className="clear-search-btn"
+            onClick={() => setSearchTerm('')}
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {/* Inline Add/Edit Form Modal */}

@@ -6,6 +6,9 @@ import ConfirmDialog from './ConfirmDialog';
 import Notification from './Notification';
 import useNotification from '../hooks/useNotification';
 import Loader from './Loader';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import "./Tickets.css";
 
 // Cache tickets globally to avoid reloading
@@ -13,14 +16,14 @@ let cachedTickets = [];
 let lastLoadTime = 0;
 const CACHE_DURATION = 30000; // 30 seconds
 
-const Tickets = ({ filterCategory, excludeResolved = false }) => {
+const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = true, showEditableNotes = false, inStockStatusFilter = null, setInStockStatusFilter }) => {
   const [allTickets, setAllTickets] = useState(cachedTickets); // Start with cached tickets
   const [displayedTickets, setDisplayedTickets] = useState([]); // Only tickets to show (9 at a time)
   const [currentBatch, setCurrentBatch] = useState(0); // Current batch number (0, 1, 2...)
   const [searchTerm, setSearchTerm] = useState("");
   const [allCategories, setAllCategories] = useState([]);
   const [selectedDate, setSelectedDate] = useState("");
-  const [selectedPriority, setSelectedPriority] = useState("");
+  const [statusFilter, setStatusFilter] = useState("active"); // "active", "cancelled", "resolved", "all"
   const [technicians, setTechnicians] = useState([]);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, type: '', ticketId: null });
   const [viewMode, setViewMode] = useState("grid"); // "grid" or "table"
@@ -28,6 +31,11 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
   const [loadingMore, setLoadingMore] = useState(false); // Loading next batch
   const BATCH_SIZE = 9; // Show 9 tickets per batch
   const { notification, showNotification, hideNotification } = useNotification();
+  const [editingNote, setEditingNote] = useState({}); // Track which ticket's note is being edited
+  const [noteValues, setNoteValues] = useState({}); // Store note values being edited
+  const [editingTicket, setEditingTicket] = useState({}); // Track which ticket is in full edit mode
+  const [ticketEditValues, setTicketEditValues] = useState({}); // Store ticket field values being edited
+  const [showExportMenu, setShowExportMenu] = useState(false); // Track export menu visibility
 
 
   // Get current user ID for user-specific tickets
@@ -139,11 +147,11 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
         }
       });
       
-      // Sort by creation date (newest first)
+      // Sort by creation date (oldest first)
       allTickets.sort((a, b) => {
         const dateA = new Date(a.createdAt || 0);
         const dateB = new Date(b.createdAt || 0);
-        return dateB - dateA;
+        return dateA - dateB;
       });
       
       console.log(`✅ Loaded ${allTickets.length} tickets`);
@@ -245,10 +253,10 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
     return () => unsubscribe();
   }, []);
 
-  const handleDelete = (id, userId) => {
+  const handleCancel = (id, userId) => {
     // Check if current admin is the one who created the ticket
     const currentUserId = getCurrentUserId();
-    console.log('🔍 handleDelete - Permission check:', {
+    console.log('🔍 handleCancel - Permission check:', {
       currentUserId,
       currentUserIdType: typeof currentUserId,
       ticketUserId: userId,
@@ -259,38 +267,58 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
     
     // Only block if both IDs exist and don't match (using loose equality to handle string/number differences)
     if (currentUserId && userId && currentUserId != userId) {
-      showNotification('You are not authorized to delete this ticket. Only the admin who created it can make changes.', 'warning');
+      showNotification('You are not authorized to cancel this ticket. Only the admin who created it can make changes.', 'warning');
       return;
     }
-    setConfirmDialog({ isOpen: true, type: 'delete', ticketId: id, userId: userId });
+    setConfirmDialog({ isOpen: true, type: 'cancel', ticketId: id, userId: userId });
   };
 
-  const confirmDelete = async () => {
+  const confirmCancel = async () => {
     try {
-      // Use the ticket's userId (admin who created it) instead of current user
-      const ticketUserId = confirmDialog.userId || getCurrentUserId();
-      if (!ticketUserId) {
-        throw new Error('User ID not found. Please login again.');
+      // Find the ticket to check if it's an In Stock ticket
+      const ticket = allTickets.find(t => t.id === confirmDialog.ticketId);
+      
+      let ticketRef;
+      if (ticket && ticket.category === 'In Stock') {
+        // For In Stock tickets, use the dedicated inStock collection
+        ticketRef = doc(db, 'mainData', 'Billuload', 'inStock', confirmDialog.ticketId);
+      } else {
+        // For regular tickets, use the user's tickets collection
+        const ticketUserId = confirmDialog.userId || getCurrentUserId();
+        if (!ticketUserId) {
+          throw new Error('User ID not found. Please login again.');
+        }
+        ticketRef = getAdminTicketDocRef(ticketUserId, confirmDialog.ticketId);
       }
-      
-      const userTicketRef = getAdminTicketDocRef(ticketUserId, confirmDialog.ticketId);
 
-      await deleteDoc(userTicketRef);
+      // Update status to Cancelled instead of deleting
+      await updateDoc(ticketRef, {
+        status: 'Cancelled',
+        cancelledAt: new Date().toISOString()
+      });
       
-      // Remove the ticket from local state immediately (no reload needed)
+      // Update the ticket in local state
       setAllTickets(prevTickets => 
-        prevTickets.filter(ticket => ticket.id !== confirmDialog.ticketId)
+        prevTickets.map(ticket => 
+          ticket.id === confirmDialog.ticketId 
+            ? { ...ticket, status: 'Cancelled', cancelledAt: new Date().toISOString() }
+            : ticket
+        )
       );
       
-      // Also remove from displayed tickets
+      // Also update displayed tickets
       setDisplayedTickets(prevTickets => 
-        prevTickets.filter(ticket => ticket.id !== confirmDialog.ticketId)
+        prevTickets.map(ticket => 
+          ticket.id === confirmDialog.ticketId 
+            ? { ...ticket, status: 'Cancelled', cancelledAt: new Date().toISOString() }
+            : ticket
+        )
       );
       
-      showNotification('Ticket deleted successfully!', 'success');
+      showNotification('Ticket cancelled successfully!', 'success');
     } catch (error) {
-      console.error('Error deleting ticket:', error);
-      showNotification('Error deleting ticket. Please try again.', 'error');
+      console.error('Error cancelling ticket:', error);
+      showNotification('Error cancelling ticket. Please try again.', 'error');
     }
     setConfirmDialog({ isOpen: false, type: '', ticketId: null, userId: null });
   };
@@ -321,14 +349,23 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
 
   const updateTicketStatus = async (id, newStatus, userId) => {
     try {
-      // Use the ticket's userId (admin who created it) instead of current user
-      const ticketUserId = userId || getCurrentUserId();
-      if (!ticketUserId) {
-        throw new Error('User ID not found. Please login again.');
+      // Find the ticket to check if it's an In Stock ticket
+      const ticket = allTickets.find(t => t.id === id);
+      
+      let ticketRef;
+      if (ticket && ticket.category === 'In Stock') {
+        // For In Stock tickets, use the dedicated inStock collection
+        ticketRef = doc(db, 'mainData', 'Billuload', 'inStock', id);
+      } else {
+        // For regular tickets, use the user's tickets collection
+        const ticketUserId = userId || getCurrentUserId();
+        if (!ticketUserId) {
+          throw new Error('User ID not found. Please login again.');
+        }
+        ticketRef = getAdminTicketDocRef(ticketUserId, id);
       }
       
-      const userTicketRef = getAdminTicketDocRef(ticketUserId, id);
-      await updateDoc(userTicketRef, { status: newStatus });
+      await updateDoc(ticketRef, { status: newStatus });
       
       // Update the ticket in local state immediately (no reload needed)
       setAllTickets(prevTickets => 
@@ -357,15 +394,25 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
 
   const confirmResolve = async () => {
     try {
-      // Use the ticket's userId (admin who created it) instead of current user
-      const ticketUserId = confirmDialog.userId || getCurrentUserId();
-      if (!ticketUserId) {
-        throw new Error('User ID not found. Please login again.');
-      }
+      // Find the ticket to check if it's an In Stock ticket
+      const ticket = allTickets.find(t => t.id === confirmDialog.ticketId);
       
       const resolvedAt = new Date().toISOString();
-      const userTicketRef = getAdminTicketDocRef(ticketUserId, confirmDialog.ticketId);
-      await updateDoc(userTicketRef, { 
+      
+      let ticketRef;
+      if (ticket && ticket.category === 'In Stock') {
+        // For In Stock tickets, use the dedicated inStock collection
+        ticketRef = doc(db, 'mainData', 'Billuload', 'inStock', confirmDialog.ticketId);
+      } else {
+        // For regular tickets, use the user's tickets collection
+        const ticketUserId = confirmDialog.userId || getCurrentUserId();
+        if (!ticketUserId) {
+          throw new Error('User ID not found. Please login again.');
+        }
+        ticketRef = getAdminTicketDocRef(ticketUserId, confirmDialog.ticketId);
+      }
+      
+      await updateDoc(ticketRef, { 
         status: 'Resolved',
         resolvedAt: resolvedAt,
         resolvedDate: resolvedAt // Fallback for old field name
@@ -397,6 +444,128 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
     setConfirmDialog({ isOpen: false, type: '', ticketId: null, userId: null });
   };
 
+  // Handle editing note/description
+  const handleEditNote = (ticketId, currentNote) => {
+    setEditingNote(prev => ({ ...prev, [ticketId]: true }));
+    setNoteValues(prev => ({ ...prev, [ticketId]: currentNote || '' }));
+  };
+
+  const handleCancelEditNote = (ticketId) => {
+    setEditingNote(prev => ({ ...prev, [ticketId]: false }));
+    setNoteValues(prev => ({ ...prev, [ticketId]: '' }));
+  };
+
+  const handleSaveNote = async (ticketId, ticket) => {
+    try {
+      const newNote = noteValues[ticketId];
+      
+      // Determine if it's an In Stock ticket or regular ticket
+      let ticketRef;
+      const fieldName = ticket.category === 'In Stock' ? 'description' : 'note';
+      
+      if (ticket.category === 'In Stock') {
+        ticketRef = doc(db, 'mainData', 'Billuload', 'inStock', ticketId);
+      } else {
+        const ticketUserId = ticket.userId || getCurrentUserId();
+        if (!ticketUserId) {
+          throw new Error('User ID not found. Please login again.');
+        }
+        ticketRef = getAdminTicketDocRef(ticketUserId, ticketId);
+      }
+      
+      await updateDoc(ticketRef, { [fieldName]: newNote });
+      
+      // Update local state
+      setAllTickets(prevTickets => 
+        prevTickets.map(t => 
+          t.id === ticketId 
+            ? { ...t, [fieldName]: newNote }
+            : t
+        )
+      );
+      
+      setDisplayedTickets(prevTickets => 
+        prevTickets.map(t => 
+          t.id === ticketId 
+            ? { ...t, [fieldName]: newNote }
+            : t
+        )
+      );
+      
+      setEditingNote(prev => ({ ...prev, [ticketId]: false }));
+      showNotification('Note updated successfully!', 'success');
+    } catch (error) {
+      console.error('Error updating note:', error);
+      showNotification('Error updating note. Please try again.', 'error');
+    }
+  };
+
+  // Handle full ticket editing
+  const handleEditTicket = (ticket) => {
+    setEditingTicket(prev => ({ ...prev, [ticket.id]: true }));
+    setTicketEditValues(prev => ({ 
+      ...prev, 
+      [ticket.id]: {
+        customerName: ticket.customerName || '',
+        productName: ticket.productName || '',
+        callId: ticket.callId || '',
+        callNo: ticket.callNo || '',
+        note: ticket.note || '',
+        description: ticket.description || '',
+        subOption: ticket.subOption || '',
+        companyName: ticket.companyName || '',
+        serialNumber: ticket.serialNumber || ''
+      }
+    }));
+  };
+
+  const handleCancelEditTicket = (ticketId) => {
+    setEditingTicket(prev => ({ ...prev, [ticketId]: false }));
+    setTicketEditValues(prev => ({ ...prev, [ticketId]: {} }));
+  };
+
+  const handleSaveTicket = async (ticketId, ticket) => {
+    try {
+      const updatedFields = ticketEditValues[ticketId];
+      
+      let ticketRef;
+      if (ticket.category === 'In Stock') {
+        ticketRef = doc(db, 'mainData', 'Billuload', 'inStock', ticketId);
+      } else {
+        const ticketUserId = ticket.userId || getCurrentUserId();
+        if (!ticketUserId) {
+          throw new Error('User ID not found. Please login again.');
+        }
+        ticketRef = getAdminTicketDocRef(ticketUserId, ticketId);
+      }
+      
+      await updateDoc(ticketRef, updatedFields);
+      
+      // Update local state
+      setAllTickets(prevTickets => 
+        prevTickets.map(t => 
+          t.id === ticketId 
+            ? { ...t, ...updatedFields }
+            : t
+        )
+      );
+      
+      setDisplayedTickets(prevTickets => 
+        prevTickets.map(t => 
+          t.id === ticketId 
+            ? { ...t, ...updatedFields }
+            : t
+        )
+      );
+      
+      setEditingTicket(prev => ({ ...prev, [ticketId]: false }));
+      showNotification('Ticket updated successfully!', 'success');
+    } catch (error) {
+      console.error('Error updating ticket:', error);
+      showNotification('Error updating ticket. Please try again.', 'error');
+    }
+  };
+
   // ✅ Updated Priority Colors: High=Red, Medium=Yellow, Low=Green
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
@@ -412,6 +581,7 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
       case "Pending": return "#f59e0b";
       case "In Progress": return "#3b82f6";
       case "Resolved": return "#10b981";
+      case "Cancelled": return "rgb(217, 37, 10)";
       default: return "#6b7280";
     }
   };
@@ -421,8 +591,116 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
       case "Pending": return "⏳";
       case "In Progress": return "🔄";
       case "Resolved": return "✅";
+      case "Cancelled": return "❌";
       default: return "📋";
     }
+  };
+
+  // Export all pending tickets to PDF
+  const exportAllPendingToPDF = () => {
+    const pendingTickets = allTickets.filter(ticket => ticket.status === 'Pending');
+    
+    if (pendingTickets.length === 0) {
+      showNotification('No pending tickets to export', 'error');
+      setShowExportMenu(false);
+      return;
+    }
+
+    const doc = new jsPDF();
+    
+    // Add title
+    doc.setFontSize(18);
+    doc.setTextColor(59, 130, 246);
+    doc.text('Pending Tickets Report', 14, 22);
+    
+    // Add generation date
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 14, 32);
+    
+    // Prepare table data
+    const tableData = pendingTickets.map(ticket => [
+      ticket.callNo || ticket.callId || ticket.ticketNumber || 'N/A',
+      ticket.customerName || 'N/A',
+      ticket.productName || 'N/A',
+      ticket.category || 'N/A',
+      ticket.status || 'N/A',
+      ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'N/A'
+    ]);
+    
+    // Add table
+    autoTable(doc, {
+      startY: 40,
+      head: [['Ticket #', 'Customer', 'Product', 'Category', 'Status', 'Date']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [59, 130, 246], fontSize: 10 },
+      styles: { fontSize: 9, cellPadding: 4 },
+      columnStyles: {
+        0: { cellWidth: 25 },
+        1: { cellWidth: 35 },
+        2: { cellWidth: 40 },
+        3: { cellWidth: 30 },
+        4: { cellWidth: 25 },
+        5: { cellWidth: 30 }
+      }
+    });
+    
+    // Save PDF
+    doc.save(`pending-tickets-${new Date().toISOString().split('T')[0]}.pdf`);
+    showNotification(`${pendingTickets.length} pending tickets exported to PDF!`, 'success');
+    setShowExportMenu(false);
+  };
+
+  // Export all pending tickets to Excel
+  const exportAllPendingToExcel = () => {
+    const pendingTickets = allTickets.filter(ticket => ticket.status === 'Pending');
+    
+    if (pendingTickets.length === 0) {
+      showNotification('No pending tickets to export', 'error');
+      setShowExportMenu(false);
+      return;
+    }
+
+    // Prepare data for Excel
+    const excelData = pendingTickets.map(ticket => ({
+      'Ticket #': ticket.callNo || ticket.callId || ticket.ticketNumber || 'N/A',
+      'Customer': ticket.customerName || 'N/A',
+      'Product': ticket.productName || 'N/A',
+      'Company': ticket.companyName || 'N/A',
+      'Serial Number': ticket.serialNumber || 'N/A',
+      'Category': ticket.category || 'N/A',
+      'Status': ticket.status || 'N/A',
+      'Created By': ticket.createdBy || 'N/A',
+      'Created Date': ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'N/A',
+      'Description': ticket.description || ticket.note || 'N/A'
+    }));
+    
+    // Create worksheet
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    
+    // Set column widths
+    ws['!cols'] = [
+      { wch: 12 }, // Ticket #
+      { wch: 20 }, // Customer
+      { wch: 25 }, // Product
+      { wch: 20 }, // Company
+      { wch: 18 }, // Serial Number
+      { wch: 15 }, // Category
+      { wch: 12 }, // Status
+      { wch: 20 }, // Created By
+      { wch: 15 }, // Created Date
+      { wch: 40 }  // Description
+    ];
+    
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Pending Tickets');
+    
+    // Save Excel file
+    XLSX.writeFile(wb, `pending-tickets-${new Date().toISOString().split('T')[0]}.xlsx`);
+    showNotification(`${pendingTickets.length} pending tickets exported to Excel!`, 'success');
+    setShowExportMenu(false);
   };
 
   const normalizeString = (str) => {
@@ -442,31 +720,109 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
   // Apply filters to displayed tickets (current batch)
   const filteredTickets = displayedTickets
     .filter(ticket => {
+      // Search filter
+      const searchMatch = searchTerm
+        ? (
+            normalizeString(ticket.customerName || '').includes(normalizeString(searchTerm)) ||
+            normalizeString(ticket.ticketNumber?.toString() || '').includes(normalizeString(searchTerm)) ||
+            normalizeString(ticket.companyName || '').includes(normalizeString(searchTerm)) ||
+            normalizeString(ticket.productName || '').includes(normalizeString(searchTerm)) ||
+            normalizeString(ticket.callId?.toString() || '').includes(normalizeString(searchTerm)) ||
+            normalizeString(ticket.callNo?.toString() || '').includes(normalizeString(searchTerm))
+          )
+        : true;
+      
       const categoryMatch = filterCategory 
         ? normalizeString(ticket.category) === normalizeString(filterCategory)
         : true;
       const dateMatch = filterTicketsByDate(ticket);
-      const priorityMatch = selectedPriority ? ticket.priority === selectedPriority : true;
-      const resolvedMatch = excludeResolved ? ticket.status !== 'Resolved' : true;
-      return categoryMatch && dateMatch && priorityMatch && resolvedMatch;
+      
+      // Status filter logic (only when showStatusFilter is true)
+      let statusMatch = true;
+      if (showStatusFilter) {
+        if (statusFilter === 'active') {
+          statusMatch = ticket.status !== 'Cancelled' && ticket.status !== 'Resolved';
+        } else if (statusFilter === 'cancelled') {
+          statusMatch = ticket.status === 'Cancelled';
+        } else if (statusFilter === 'resolved') {
+          statusMatch = ticket.status === 'Resolved';
+        }
+      }
+      
+      // In Stock status filter (when viewing In Stock category)
+      let inStockMatch = true;
+      if (inStockStatusFilter && normalizeString(ticket.category) === 'in stock') {
+        if (inStockStatusFilter === 'active') {
+          inStockMatch = ticket.status === 'Pending' || ticket.status === 'In Progress';
+        } else if (inStockStatusFilter === 'pending') {
+          inStockMatch = ticket.status === 'Pending';
+        } else if (inStockStatusFilter === 'resolved') {
+          inStockMatch = ticket.status === 'Resolved';
+        } else if (inStockStatusFilter === 'cancelled') {
+          inStockMatch = ticket.status === 'Cancelled';
+        }
+        // 'all' shows everything, no filter needed
+      }
+      
+      const resolvedMatch = excludeResolved ? ticket.status !== 'Resolved' && ticket.status !== 'Cancelled' : true;
+      return searchMatch && categoryMatch && dateMatch && statusMatch && resolvedMatch && inStockMatch;
     })
     .sort((a, b) => {
-      // Sort by newest first (createdAt descending)
+      // Sort by oldest first (createdAt ascending)
       const dateA = new Date(a.createdAt);
       const dateB = new Date(b.createdAt);
-      return dateB - dateA;
+      return dateA - dateB;
     });
 
   // Get total count from all tickets (for display)
   const totalFilteredCount = allTickets
     .filter(ticket => {
+      // Search filter
+      const searchMatch = searchTerm
+        ? (
+            normalizeString(ticket.customerName || '').includes(normalizeString(searchTerm)) ||
+            normalizeString(ticket.ticketNumber?.toString() || '').includes(normalizeString(searchTerm)) ||
+            normalizeString(ticket.companyName || '').includes(normalizeString(searchTerm)) ||
+            normalizeString(ticket.productName || '').includes(normalizeString(searchTerm)) ||
+            normalizeString(ticket.callId?.toString() || '').includes(normalizeString(searchTerm)) ||
+            normalizeString(ticket.callNo?.toString() || '').includes(normalizeString(searchTerm))
+          )
+        : true;
+      
       const categoryMatch = filterCategory 
         ? normalizeString(ticket.category) === normalizeString(filterCategory)
         : true;
       const dateMatch = filterTicketsByDate(ticket);
-      const priorityMatch = selectedPriority ? ticket.priority === selectedPriority : true;
-      const resolvedMatch = excludeResolved ? ticket.status !== 'Resolved' : true;
-      return categoryMatch && dateMatch && priorityMatch && resolvedMatch;
+      
+      // Status filter logic (only when showStatusFilter is true)
+      let statusMatch = true;
+      if (showStatusFilter) {
+        if (statusFilter === 'active') {
+          statusMatch = ticket.status !== 'Cancelled' && ticket.status !== 'Resolved';
+        } else if (statusFilter === 'cancelled') {
+          statusMatch = ticket.status === 'Cancelled';
+        } else if (statusFilter === 'resolved') {
+          statusMatch = ticket.status === 'Resolved';
+        }
+      }
+      
+      // In Stock status filter (when viewing In Stock category)
+      let inStockMatch = true;
+      if (inStockStatusFilter && normalizeString(ticket.category) === 'in stock') {
+        if (inStockStatusFilter === 'active') {
+          inStockMatch = ticket.status === 'Pending' || ticket.status === 'In Progress';
+        } else if (inStockStatusFilter === 'pending') {
+          inStockMatch = ticket.status === 'Pending';
+        } else if (inStockStatusFilter === 'resolved') {
+          inStockMatch = ticket.status === 'Resolved';
+        } else if (inStockStatusFilter === 'cancelled') {
+          inStockMatch = ticket.status === 'Cancelled';
+        }
+        // 'all' shows everything, no filter needed
+      }
+      
+      const resolvedMatch = excludeResolved ? ticket.status !== 'Resolved' && ticket.status !== 'Cancelled' : true;
+      return searchMatch && categoryMatch && dateMatch && statusMatch && resolvedMatch && inStockMatch;
     }).length;
 
   const getCategoryDisplayName = (category) => {
@@ -518,23 +874,40 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                 </div>
               </div>
 
-              <div className="status-filter">
-                <label htmlFor="priorityFilter" className="filter-label">
-                  Priority:
-                </label>
-                <select
-                  id="priorityFilter"
-                  value={selectedPriority}
-                  onChange={(e) => setSelectedPriority(e.target.value)}
-                  className="filter-select"
-                >
-                  <option value="">All Priorities</option>
-                  <option value="High">High</option>
-                  <option value="Low">Low</option>
-                  <option value="Medium">Medium</option>
-                </select>
-              </div>
-              
+              {inStockStatusFilter !== null && setInStockStatusFilter && (
+                <div className="status-filter">
+                  <label className="filter-label">Status:</label>
+                  <select
+                    value={inStockStatusFilter}
+                    onChange={(e) => setInStockStatusFilter(e.target.value)}
+                    className="status-select"
+                  >
+                    <option value="active">Active Tickets</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="all">All Status</option>
+                  </select>
+                </div>
+              )}
+
+              {showStatusFilter && (
+                <div className="status-filter">
+                  <label htmlFor="statusFilter" className="filter-label">
+                    Status:
+                  </label>
+                  <select
+                    id="statusFilter"
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value)}
+                    className="filter-select"
+                  >
+                    <option value="active">Active Tickets</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="resolved">Resolved</option>
+                    <option value="all">All Tickets</option>
+                  </select>
+                </div>
+              )}
 
               <div className="date-filter-section">
                 <label htmlFor="dateFilter" className="date-filter-label">
@@ -556,9 +929,135 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                   </button>
                 )}
               </div>
+
+              {/* Export Button */}
+              <div style={{ position: 'relative', marginLeft: '15px' }}>
+                <button
+                  onClick={() => setShowExportMenu(!showExportMenu)}
+                  style={{
+                    padding: '8px 16px',
+                    fontSize: '0.9rem',
+                    borderRadius: '6px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    transition: 'all 0.3s ease',
+                    boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)'
+                  }}
+                  onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+                  onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+                >
+                  <span style={{ fontSize: '1.1rem' }}>📥</span>
+                  Export
+                </button>
+                
+                {showExportMenu && (
+                  <>
+                    <div 
+                      style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        zIndex: 998
+                      }}
+                      onClick={() => setShowExportMenu(false)}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 'calc(100% + 8px)',
+                        right: 0,
+                        background: 'white',
+                        borderRadius: '8px',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        zIndex: 999,
+                        minWidth: '180px',
+                        overflow: 'hidden',
+                        border: '1px solid #e5e7eb'
+                      }}
+                    >
+                      <button
+                        onClick={exportAllPendingToPDF}
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          border: 'none',
+                          background: 'white',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          transition: 'background 0.2s',
+                          color: '#374151',
+                          fontWeight: '500'
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
+                        onMouseLeave={(e) => e.target.style.background = 'white'}
+                      >
+                        <span style={{ fontSize: '1.2rem' }}>📄</span>
+                        Export as Pdf
+                      </button>
+                      <button
+                        onClick={exportAllPendingToExcel}
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          border: 'none',
+                          background: 'white',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          fontSize: '0.9rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '10px',
+                          transition: 'background 0.2s',
+                          color: '#374151',
+                          fontWeight: '500'
+                        }}
+                        onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
+                        onMouseLeave={(e) => e.target.style.background = 'white'}
+                      >
+                        <span style={{ fontSize: '1.2rem' }}>📊</span>
+                        Export as Xl
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
+      </div>
+
+      <div className="search-bar-section">
+        <div className="search-container">
+          <span className="search-icon">🔍</span>
+          <input
+            type="text"
+            placeholder="Search customers..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+          />
+        </div>
+        {searchTerm && (
+          <button 
+            className="clear-search-btn"
+            onClick={() => setSearchTerm('')}
+            title="Clear search"
+          >
+            ✕
+          </button>
+        )}
       </div>
 
       {viewMode === "grid" ? (
@@ -568,22 +1067,168 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
             filteredTickets.map(ticket => (
               <div
                 key={ticket.id}
-                className={`ticket-card priority-${ticket.priority?.toLowerCase() || "medium"}`}
+                className="ticket-card"
               >
                 <div className="ticket-header">
                   <div className="header-top">
-                    <h3 className="ticket-number">#{ticket.ticketNumber}</h3>
-                    <div 
-                      className="status-badge" 
-                      style={{ backgroundColor: getStatusColor(ticket.status) }}
-                    >
-                      <span className="status-icon">{getStatusIcon(ticket.status)}</span>
-                      {ticket.status}
+                    <h3 className="ticket-number">#{ticket.callNo || ticket.callId || ticket.ticketNumber}</h3>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div 
+                        className="status-badge" 
+                        style={{ backgroundColor: getStatusColor(ticket.status) }}
+                      >
+                        <span className="status-icon">{getStatusIcon(ticket.status)}</span>
+                        {ticket.status}
+                      </div>
+                      {/* Edit button for Pending and In Progress tickets in Dashboard */}
+                      {showEditableNotes && (ticket.status === 'Pending' || ticket.status === 'In Progress') && !editingTicket[ticket.id] && (
+                        <button
+                          className="btn-add-note-quick"
+                          onClick={() => handleEditTicket(ticket)}
+                          title="Edit ticket details"
+                        >
+                          +
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
 
                 <div className="ticket-body">
+                  {editingTicket[ticket.id] ? (
+                    /* Edit Mode - All fields editable */
+                    <div className="ticket-edit-mode">
+                      <div className="edit-section">
+                        <div className="edit-row">
+                          <span className="edit-label">Customer</span>
+                          <input
+                            type="text"
+                            className="edit-input"
+                            value={ticketEditValues[ticket.id]?.customerName || ''}
+                            onChange={(e) => setTicketEditValues(prev => ({
+                              ...prev,
+                              [ticket.id]: { ...prev[ticket.id], customerName: e.target.value }
+                            }))}
+                            placeholder="Customer name"
+                          />
+                        </div>
+                        <div className="edit-row">
+                          <span className="edit-label">Product</span>
+                          <input
+                            type="text"
+                            className="edit-input"
+                            value={ticketEditValues[ticket.id]?.productName || ''}
+                            onChange={(e) => setTicketEditValues(prev => ({
+                              ...prev,
+                              [ticket.id]: { ...prev[ticket.id], productName: e.target.value }
+                            }))}
+                            placeholder="Product name"
+                          />
+                        </div>
+                        <div className="edit-row">
+                          <span className="edit-label">Company</span>
+                          <input
+                            type="text"
+                            className="edit-input"
+                            value={ticketEditValues[ticket.id]?.companyName || ''}
+                            onChange={(e) => setTicketEditValues(prev => ({
+                              ...prev,
+                              [ticket.id]: { ...prev[ticket.id], companyName: e.target.value }
+                            }))}
+                            placeholder="Company name"
+                          />
+                        </div>
+                        <div className="edit-row">
+                          <span className="edit-label">Serial Number</span>
+                          <input
+                            type="text"
+                            className="edit-input"
+                            value={ticketEditValues[ticket.id]?.serialNumber || ''}
+                            onChange={(e) => setTicketEditValues(prev => ({
+                              ...prev,
+                              [ticket.id]: { ...prev[ticket.id], serialNumber: e.target.value }
+                            }))}
+                            placeholder="Serial number"
+                          />
+                        </div>
+                        {(ticket.category === 'Demo' || ticket.category === 'Service') && (
+                          <div className="edit-row">
+                            <span className="edit-label">Call ID</span>
+                            <input
+                              type="text"
+                              className="edit-input"
+                              value={ticketEditValues[ticket.id]?.callId || ''}
+                              onChange={(e) => setTicketEditValues(prev => ({
+                                ...prev,
+                                [ticket.id]: { ...prev[ticket.id], callId: e.target.value }
+                              }))}
+                              placeholder="Call ID"
+                            />
+                          </div>
+                        )}
+                        {ticket.category === 'In Stock' && (
+                          <div className="edit-row">
+                            <span className="edit-label">Call No</span>
+                            <input
+                              type="text"
+                              className="edit-input"
+                              value={ticketEditValues[ticket.id]?.callNo || ''}
+                              onChange={(e) => setTicketEditValues(prev => ({
+                                ...prev,
+                                [ticket.id]: { ...prev[ticket.id], callNo: e.target.value }
+                              }))}
+                              placeholder="Call number"
+                            />
+                          </div>
+                        )}
+                        <div className="edit-row">
+                          <span className="edit-label">Assigned To</span>
+                          <input
+                            type="text"
+                            className="edit-input"
+                            value={ticketEditValues[ticket.id]?.subOption || ''}
+                            onChange={(e) => setTicketEditValues(prev => ({
+                              ...prev,
+                              [ticket.id]: { ...prev[ticket.id], subOption: e.target.value }
+                            }))}
+                            placeholder="Assigned to"
+                          />
+                        </div>
+                        <div className="edit-row full-width">
+                          <span className="edit-label">Note</span>
+                          <textarea
+                            className="edit-textarea"
+                            value={ticketEditValues[ticket.id]?.[ticket.category === 'In Stock' ? 'description' : 'note'] || ''}
+                            onChange={(e) => setTicketEditValues(prev => ({
+                              ...prev,
+                              [ticket.id]: { 
+                                ...prev[ticket.id], 
+                                [ticket.category === 'In Stock' ? 'description' : 'note']: e.target.value 
+                              }
+                            }))}
+                            placeholder="Add note..."
+                            rows="3"
+                          />
+                        </div>
+                      </div>
+                      <div className="edit-actions">
+                        <button 
+                          className="btn-save-ticket"
+                          onClick={() => handleSaveTicket(ticket.id, ticket)}
+                        >
+                          💾 Save All Changes
+                        </button>
+                        <button 
+                          className="btn-cancel-ticket"
+                          onClick={() => handleCancelEditTicket(ticket.id)}
+                        >
+                          ❌ Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* View Mode - Display only */
+                    <>
                   <div className="info-section">
                     <div className="info-row">
                       <span className="info-label">Customer</span>
@@ -603,13 +1248,6 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
 
                   <div className="meta-section">
                     <div className="priority-info">
-                      <span className="meta-label">Priority</span>
-                      <div 
-                        className="priority-tag"
-                        style={{ backgroundColor: getPriorityColor(ticket.priority) }}
-                      >
-                        {ticket.priority}
-                      </div>
                       <div className="meta-dates">
                         <div className="start-date">
                           <span className="date-label">Start:</span>
@@ -659,15 +1297,82 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                       )}
                     </div>
                   </div>
-                  {(ticket.category === "Third Party" || ticket.category === "In Store") && ticket.note && (
-                    <div className="ticket-note">
-                      <span className="note-label">📝 Note:</span>
-                      <span className="note-text">{ticket.note}</span>
+                  
+                  {/* Editable Note Section */}
+                  {/* Show for Third Party & In Store: Always if note exists or when editing */}
+                  {/* Show for Demo & Service in Dashboard: Only when editing (after + button click) */}
+                  {/* Show for In Stock in Dashboard: Always if description exists or when editing */}
+                  {(ticket.status === 'Pending' || ticket.status === 'In Progress') && (
+                    // Third Party & In Store: Show if note exists OR in Tickets section
+                    ((ticket.category === 'Third Party' || ticket.category === 'In Store') && (ticket.note || !showEditableNotes || editingNote[ticket.id])) ||
+                    // In Stock in Dashboard: Show if description exists or editing
+                    (showEditableNotes && ticket.category === 'In Stock' && (ticket.description || editingNote[ticket.id])) ||
+                    // Demo & Service in Dashboard: Only show when editing (after + click)
+                    (showEditableNotes && (ticket.category === 'Demo' || ticket.category === 'Service') && editingNote[ticket.id])
+                  ) && (
+                    <div className="ticket-note-section">
+                      <div className="note-header">
+                        <span className="note-label">📝 {ticket.category === 'In Stock' ? 'Description' : 'Note'}:</span>
+                        {!editingNote[ticket.id] && (
+                          <button 
+                            className="btn-edit-note"
+                            onClick={() => handleEditNote(ticket.id, ticket.category === 'In Stock' ? ticket.description : ticket.note)}
+                            title="Edit note"
+                          >
+                            ✏️
+                          </button>
+                        )}
+                      </div>
+                      {editingNote[ticket.id] ? (
+                        <div className="note-edit-container">
+                          <textarea
+                            className="note-textarea"
+                            value={noteValues[ticket.id] || ''}
+                            onChange={(e) => setNoteValues(prev => ({ ...prev, [ticket.id]: e.target.value }))}
+                            placeholder={`Add ${ticket.category === 'In Stock' ? 'description' : 'note'} for this ticket...`}
+                            rows="3"
+                          />
+                          <div className="note-actions">
+                            <button 
+                              className="btn-save-note"
+                              onClick={() => handleSaveNote(ticket.id, ticket)}
+                            >
+                              💾 Save
+                            </button>
+                            <button 
+                              className="btn-cancel-note"
+                              onClick={() => handleCancelEditNote(ticket.id)}
+                            >
+                              ❌ Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="note-display">
+                          <span className="note-text">
+                            {(ticket.category === 'In Stock' ? ticket.description : ticket.note) || 'No note added yet. Click Edit to add one.'}
+                          </span>
+                        </div>
+                      )}
                     </div>
+                  )}
+                  
+                  {/* Display-only note for resolved/cancelled tickets */}
+                  {(ticket.status === 'Resolved' || ticket.status === 'Cancelled') && (ticket.note || ticket.description) && (
+                    (ticket.category === 'Third Party' || ticket.category === 'In Store' || ticket.category === 'In Stock')
+                  ) && (
+                    <div className="ticket-note">
+                      <span className="note-label">📝 {ticket.category === 'In Stock' ? 'Description' : 'Note'}:</span>
+                      <span className="note-text">{ticket.category === 'In Stock' ? ticket.description : ticket.note}</span>
+                    </div>
+                  )}
+                  </>
                   )}
                 </div>
 
                 <div className="ticket-actions">
+                  {!editingTicket[ticket.id] && (
+                    <>
                   <div className="action-group">
                     <select
                       value={ticket.status}
@@ -680,12 +1385,14 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                     </select>
                   </div>
                   <button
-                    className="btn-delete"
-                    onClick={() => handleDelete(ticket.id, ticket.userId)}
-                    title="Delete ticket"
+                    className="btn-cancel"
+                    onClick={() => handleCancel(ticket.id, ticket.userId)}
+                    title="Cancel ticket"
                   >
-                    <span className="btn-icon">🗑</span>
+                    ❌ Cancel
                   </button>
+                  </>
+                  )}
                 </div>
               </div>
             ))
@@ -751,11 +1458,10 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                 <table className="tickets-table">
                   <thead>
                     <tr>
-                      <th>Ticket #</th>
+                      <th>Call No</th>
                       <th>Customer</th>
                       <th>Product</th>
                       <th>Created By</th>
-                      <th>Priority</th>
                       <th>Status</th>
                       <th>Assigned To</th>
                       <th>Category</th>
@@ -767,8 +1473,8 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                   </thead>
                   <tbody>
                     {filteredTickets.map(ticket => (
-                      <tr key={ticket.id} className={`table-row priority-${ticket.priority?.toLowerCase() || "medium"}`}>
-                        <td className="ticket-number-cell">#{ticket.ticketNumber}</td>
+                      <tr key={ticket.id} className="table-row">
+                        <td className="ticket-number-cell">#{ticket.callNo || ticket.callId || ticket.ticketNumber}</td>
                         <td className="customer-cell">{ticket.customerName}</td>
                         <td className="product-cell">{ticket.productName}</td>
                         <td className="admin-cell">
@@ -777,14 +1483,6 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                           ) : (
                             <span className="admin-name-table unknown">Unknown</span>
                           )}
-                        </td>
-                        <td className="priority-cell">
-                          <div 
-                            className="priority-tag-small"
-                            style={{ backgroundColor: getPriorityColor(ticket.priority) }}
-                          >
-                            {ticket.priority}
-                          </div>
                         </td>
                         <td className="status-cell">
                           <div 
@@ -843,11 +1541,11 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                               <option value="Resolved">Resolved</option>
                             </select>
                             <button
-                              className="btn-delete-small"
-                              onClick={() => handleDelete(ticket.id, ticket.userId)}
-                              title="Delete ticket"
+                              className="btn-cancel-small"
+                              onClick={() => handleCancel(ticket.id, ticket.userId)}
+                              title="Cancel ticket"
                             >
-                              🗑
+                              ❌
                             </button>
                           </div>
                         </td>
@@ -862,7 +1560,7 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                 {filteredTickets.map(ticket => (
                   <div key={`mobile-${ticket.id}`} className="mobile-ticket-card">
                     <div className="mobile-card-header">
-                      <span className="mobile-ticket-number">#{ticket.ticketNumber}</span>
+                      <span className="mobile-ticket-number">#{ticket.callNo || ticket.callId || ticket.ticketNumber}</span>
                       <div 
                         className="status-badge-small" 
                         style={{ backgroundColor: getStatusColor(ticket.status) }}
@@ -887,15 +1585,6 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                           <span className="mobile-info-value admin-name">👤 {ticket.createdBy}</span>
                         </div>
                       )}
-                      <div className="mobile-info-row">
-                        <span className="mobile-info-label">Priority</span>
-                        <div 
-                          className="priority-tag-small"
-                          style={{ backgroundColor: getPriorityColor(ticket.priority) }}
-                        >
-                          {ticket.priority}
-                        </div>
-                      </div>
                       <div className="mobile-info-row">
                         <span className="mobile-info-label">Assigned To</span>
                         <span className="mobile-info-value">{ticket.subOption || "Unassigned"}</span>
@@ -951,11 +1640,11 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
                         <option value="Resolved">Resolved</option>
                       </select>
                       <button
-                        className="mobile-delete-btn"
-                        onClick={() => handleDelete(ticket.id, ticket.userId)}
-                        title="Delete ticket"
+                        className="mobile-cancel-btn"
+                        onClick={() => handleCancel(ticket.id, ticket.userId)}
+                        title="Cancel ticket"
                       >
-                        🗑
+                        ❌ Cancel
                       </button>
                     </div>
                   </div>
@@ -1025,13 +1714,13 @@ const Tickets = ({ filterCategory, excludeResolved = false }) => {
 
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
-        title={confirmDialog.type === 'delete' ? 'Delete Ticket' : 'Resolve Ticket'}
+        title={confirmDialog.type === 'cancel' ? 'Cancel Ticket' : 'Resolve Ticket'}
         message={
-          confirmDialog.type === 'delete'
-            ? 'Are you sure you want to delete this ticket?'
+          confirmDialog.type === 'cancel'
+            ? 'Are you sure you want to cancel this ticket? This will mark it as cancelled.'
             : 'Are you sure you want to mark this ticket as resolved?'
         }
-        onConfirm={confirmDialog.type === 'delete' ? confirmDelete : confirmResolve}
+        onConfirm={confirmDialog.type === 'cancel' ? confirmCancel : confirmResolve}
         onCancel={() => setConfirmDialog({ isOpen: false, type: '', ticketId: null })}
         confirmText="OK"
         cancelText="Cancel"
