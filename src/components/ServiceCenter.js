@@ -21,8 +21,8 @@ const ServiceCenter = () => {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, id: null, name: '' });
   const { notification, showNotification, hideNotification } = useNotification();
-  const [viewMode, setViewMode] = useState("grid"); // "grid" or "table"
-  
+
+
   // Get selected service from URL
   const selectedService = serviceId ? services.find(s => s.id === serviceId) : null;
 
@@ -42,22 +42,22 @@ const ServiceCenter = () => {
         console.log('🎯 ServiceCenter: Loading tickets from all admins...');
         const { getDocs, collection } = await import('firebase/firestore');
         const { db } = await import('../firebase/config');
-        
+
         // Get all users (admins)
         const usersRef = getCollectionRef('users');
         const usersSnapshot = await getDocs(usersRef);
         console.log(`👥 ServiceCenter: Found ${usersSnapshot.docs.length} users`);
-        
+
         const allTickets = [];
-        
+
         // Load tickets from each user
         for (const userDoc of usersSnapshot.docs) {
           const userData = userDoc.data();
           const ticketsRef = collection(db, 'mainData', 'Billuload', 'users', userDoc.id, 'tickets');
           const ticketsSnapshot = await getDocs(ticketsRef);
-          
+
           console.log(`🎫 ServiceCenter: Found ${ticketsSnapshot.docs.length} tickets for user ${userData.email || userDoc.id}`);
-          
+
           ticketsSnapshot.docs.forEach(ticketDoc => {
             allTickets.push({
               id: ticketDoc.id,
@@ -67,22 +67,22 @@ const ServiceCenter = () => {
             });
           });
         }
-        
+
         console.log(`✅ ServiceCenter: Loaded ${allTickets.length} total tickets`);
         setTickets(allTickets);
       } catch (error) {
         console.error('❌ ServiceCenter: Error loading tickets:', error);
       }
     };
-    
+
     loadAllTickets();
-    
+
     // Refresh tickets every 30 seconds to catch new tickets
     const ticketRefreshInterval = setInterval(loadAllTickets, 30000);
 
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener('resize', handleResize);
-    
+
     return () => {
       window.removeEventListener('resize', handleResize);
       unsubscribeServices();
@@ -152,32 +152,32 @@ const ServiceCenter = () => {
   if (selectedService) {
     console.log('🔍 ServiceCenter: Filtering tickets for service:', selectedService.serviceCenterName);
     console.log('📊 ServiceCenter: Total tickets available:', tickets.length);
-    
+
     const serviceTickets = tickets.filter(ticket => {
       // Normalize strings for comparison (case-insensitive, trim whitespace)
       const normalizeString = (str) => (str || '').toLowerCase().trim();
-      
+
       const ticketSubOption = normalizeString(ticket.subOption);
       const serviceCenterName = normalizeString(selectedService.serviceCenterName);
       const companyName = normalizeString(selectedService.companyName);
-      
+
       // Match by subOption (where service center name is stored)
-      const matchesSubOption = ticketSubOption === serviceCenterName || 
-                                ticketSubOption === companyName;
-      
+      const matchesSubOption = ticketSubOption === serviceCenterName ||
+        ticketSubOption === companyName;
+
       // Also check if category is "Service" or "Demo" to ensure it's a service center ticket
       const ticketCategory = normalizeString(ticket.category);
       const isServiceTicket = ticketCategory === "service" || ticketCategory === "demo";
-      
+
       const matches = matchesSubOption && isServiceTicket;
-      
+
       if (matches) {
         console.log('✅ Matched ticket:', ticket.ticketNumber, 'subOption:', ticket.subOption, 'category:', ticket.category);
       }
-      
+
       return matches;
     });
-    
+
     console.log('✅ ServiceCenter: Filtered tickets count:', serviceTickets.length);
 
     return (
@@ -210,121 +210,39 @@ const ServiceCenter = () => {
           <div className="tickets-header">
             <div className="header-main">
               <h2>Assigned Tickets ({serviceTickets.length})</h2>
-              
-              <div className="view-toggle-section">
-                <label className="filter-label">View:</label>
-                <div className="view-toggle-buttons">
-                  <button
-                    className={`view-toggle-btn ${viewMode === "grid" ? "active" : ""}`}
-                    onClick={() => setViewMode("grid")}
-                  >
-                    <span className="view-icon">⊞</span>
-                    Grid
-                  </button>
-                  <button
-                    className={`view-toggle-btn ${viewMode === "table" ? "active" : ""}`}
-                    onClick={() => setViewMode("table")}
-                  >
-                    <span className="view-icon">☰</span>
-                    Table
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
-          
+
           {serviceTickets.length > 0 ? (
-            viewMode === "grid" ? (
-            <div className="tickets-grid">
-              {serviceTickets.map(ticket => {
-                const status = ticket.status || 'Pending';
-                const statusClass = status === 'Resolved' ? 'status-resolved' : 
-                                   status === 'In Progress' ? 'status-in-progress' : 
-                                   status === 'Cancelled' ? 'status-cancelled' : 
-                                   'status-pending';
-                const statusIcon = status === 'Resolved' ? '✅' : 
-                                  status === 'In Progress' ? '🔄' : 
-                                  status === 'Cancelled' ? '❌' : 
-                                  '⏳';
-                
-                return (
-                <div 
-                  key={ticket.id} 
-                  className="ticket-card service-ticket-card"
-                >
-                  <div className="ticket-header">
-                    <div className="header-top">
-                      <h3 className="ticket-number">#{ticket.ticketNumber}</h3>
-                      <div className={`status-badge ${statusClass}`}>
-                        <span className="status-icon">{statusIcon}</span>
-                        {status}
-                      </div>
-                    </div>
-                  </div>
+            <div className="tickets-table-container">
+              <div className="table-responsive">
+                <table className="tickets-table">
+                  <thead>
+                    <tr>
+                      <th>Call ID</th>
+                      <th>Customer</th>
+                      <th>Product</th>
+                      <th>Category</th>
+                      <th>Status</th>
+                      <th>Assigned To</th>
+                      <th>Created Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {serviceTickets.map(ticket => {
+                      const status = ticket.status || 'Pending';
+                      const statusClass = status === 'Resolved' ? 'status-resolved' :
+                        status === 'In Progress' ? 'status-in-progress' :
+                          status === 'Cancelled' ? 'status-cancelled' :
+                            'status-pending';
+                      const statusIcon = status === 'Resolved' ? '✅' :
+                        status === 'In Progress' ? '🔄' :
+                          status === 'Cancelled' ? '❌' :
+                            '⏳';
 
-                  <div className="ticket-body">
-                    <div className="info-section">
-                      <div className="info-row">
-                        <span className="info-label">Customer</span>
-                        <span className="info-value">{ticket.customerName}</span>
-                      </div>
-                      <div className="info-row">
-                        <span className="info-label">Product</span>
-                        <span className="info-value">{ticket.productName}</span>
-                      </div>
-                    </div>
-
-                    <div className="meta-section">
-                      <div className="priority-info">
-                        <span className="meta-date">
-                          {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('en-GB', { 
-                            day: '2-digit', 
-                            month: '2-digit', 
-                            year: 'numeric' 
-                          }) : 'N/A'}
-                        </span>
-                      </div>
-                      <div className="assigned-info">
-                        <span className="meta-label">Assigned To</span>
-                        <span className="meta-value">{ticket.subOption || "Unassigned"}</span>
-                        <span className="meta-category">{ticket.category || 'Service'}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                );
-              })}
-            </div>
-            ) : (
-              <div className="tickets-table-container">
-                <div className="table-responsive">
-                  <table className="tickets-table">
-                    <thead>
-                      <tr>
-                        <th>Ticket #</th>
-                        <th>Customer</th>
-                        <th>Product</th>
-                        <th>Category</th>
-                        <th>Status</th>
-                        <th>Assigned To</th>
-                        <th>Created Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {serviceTickets.map(ticket => {
-                        const status = ticket.status || 'Pending';
-                        const statusClass = status === 'Resolved' ? 'status-resolved' : 
-                                           status === 'In Progress' ? 'status-in-progress' : 
-                                           status === 'Cancelled' ? 'status-cancelled' : 
-                                           'status-pending';
-                        const statusIcon = status === 'Resolved' ? '✅' : 
-                                          status === 'In Progress' ? '🔄' : 
-                                          status === 'Cancelled' ? '❌' : 
-                                          '⏳';
-                        
-                        return (
+                      return (
                         <tr key={ticket.id}>
-                          <td className="ticket-number-cell">#{ticket.ticketNumber}</td>
+                          <td className="ticket-number-cell">#{ticket.callId || ticket.ticketNumber}</td>
                           <td>{ticket.customerName}</td>
                           <td>{ticket.productName}</td>
                           <td>
@@ -338,26 +256,26 @@ const ServiceCenter = () => {
                           </td>
                           <td>{ticket.subOption || "Unassigned"}</td>
                           <td>
-                            {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('en-GB', { 
-                              day: '2-digit', 
-                              month: '2-digit', 
-                              year: 'numeric' 
+                            {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('en-GB', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric'
                             }) : 'N/A'}
                           </td>
                         </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )
+            </div>
           ) : (
             <div className="empty-state">
               <p>No tickets assigned to this service center yet.</p>
             </div>
-          )}
-        </div>
+          )
+          }
+        </div >
 
         <Notification
           message={notification.message}
@@ -365,7 +283,7 @@ const ServiceCenter = () => {
           isVisible={notification.isVisible}
           onClose={hideNotification}
         />
-      </div>
+      </div >
     );
   }
 
@@ -390,7 +308,7 @@ const ServiceCenter = () => {
           />
         </div>
         {searchTerm && (
-          <button 
+          <button
             className="clear-search-btn"
             onClick={() => setSearchTerm('')}
           >
@@ -417,12 +335,12 @@ const ServiceCenter = () => {
                   </thead>
                   <tbody>
                     {filteredServices.map(service => (
-                      <tr 
-                      key={service.id} 
-                      className="service-table-row"
-                      onClick={() => handleServiceClick(service)}
-                      style={{ cursor: 'pointer' }}
-                    >
+                      <tr
+                        key={service.id}
+                        className="service-table-row"
+                        onClick={() => handleServiceClick(service)}
+                        style={{ cursor: 'pointer' }}
+                      >
                         <td>
                           <div className="service-info">
                             <div className="service-icon">{service.companyName?.charAt(0).toUpperCase() || 'C'}</div>
@@ -451,8 +369,8 @@ const ServiceCenter = () => {
             {isMobile && (
               <div className="services-cards">
                 {filteredServices.map(service => (
-                  <div 
-                    key={service.id} 
+                  <div
+                    key={service.id}
                     className="service-card clickable-service-card"
                     onClick={() => handleServiceClick(service)}
                   >
@@ -469,7 +387,7 @@ const ServiceCenter = () => {
                         <button className="btn-icon btn-delete" onClick={() => handleDelete(service.id)}>🗑️</button>
                       </div>
                     </div>
-                    
+
                     <div className="card-content">
                       <div className="card-section">
                         <h4>Contact Information</h4>
@@ -480,12 +398,12 @@ const ServiceCenter = () => {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="card-section">
                         <h4>Address</h4>
                         <p>{service.address || 'No address provided'}</p>
                       </div>
-                      
+
                       <div className="card-footer">
                         <div className="date-section">
                           <span className="date-label">Created:</span>
@@ -507,7 +425,7 @@ const ServiceCenter = () => {
           </div>
         )}
       </div>
-      
+
       <Notification
         message={notification.message}
         type={notification.type}

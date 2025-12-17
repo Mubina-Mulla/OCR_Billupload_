@@ -28,8 +28,8 @@ const Technicians = () => {
   const { notification, showNotification, hideNotification } = useNotification();
   const [showHistory, setShowHistory] = useState(false);
   const [customerTransactions, setCustomerTransactions] = useState([]);
-  const [viewMode, setViewMode] = useState("grid"); // "grid" or "table"
-  
+
+
   // Get selected tech from URL
   const selectedTech = techId ? technicians.find(t => t.id === techId) : null;
 
@@ -52,11 +52,11 @@ const Technicians = () => {
         const usersRef = getCollectionRef("users");
         const usersSnapshot = await getDocs(usersRef);
         const allTickets = [];
-        
+
         for (const userDoc of usersSnapshot.docs) {
           const userTicketsRef = collection(db, 'mainData', 'Billuload', 'users', userDoc.id, 'tickets');
           const ticketsSnapshot = await getDocs(userTicketsRef);
-          
+
           ticketsSnapshot.docs.forEach(ticketDoc => {
             allTickets.push({
               id: ticketDoc.id,
@@ -66,20 +66,20 @@ const Technicians = () => {
             });
           });
         }
-        
+
         setTickets(allTickets);
       } catch (error) {
         console.error('Error fetching user tickets:', error);
         setTickets([]);
       }
     };
-    
+
     // Initial fetch
     loadAllTickets();
-    
+
     // Set up interval to refresh tickets every 30 seconds
     const ticketInterval = setInterval(loadAllTickets, 30000);
-    
+
     const unsubscribeTickets = () => {
       clearInterval(ticketInterval);
     };
@@ -114,7 +114,7 @@ const Technicians = () => {
         (tech) =>
           tech.name?.toLowerCase().includes(lower) ||
           tech.phone?.toLowerCase().includes(lower) ||
-          (Array.isArray(tech.skills) 
+          (Array.isArray(tech.skills)
             ? tech.skills.some(skill => skill?.toLowerCase().includes(lower))
             : tech.skills?.toLowerCase().includes(lower)) ||
           tech.address?.toLowerCase().includes(lower)
@@ -189,14 +189,14 @@ const Technicians = () => {
     let techTickets = tickets.filter(ticket => {
       // Check if ticket is assigned to this technician
       const isAssignedToTech = (
-        ticket.subOption === selectedTech.name || 
+        ticket.subOption === selectedTech.name ||
         ticket.assignedTo === selectedTech.name ||
         ticket.assignedTo === selectedTech.id
       );
-      
+
       // Only show tickets for categories where technicians are assigned (In Store & Third Party)
       const isValidCategory = ticket.category === "In Store" || ticket.category === "Third Party";
-      
+
       // Debug logging for each ticket
       if (isAssignedToTech) {
         console.log(`✅ Found assigned ticket:`, {
@@ -207,12 +207,12 @@ const Technicians = () => {
           isValidCategory
         });
       }
-      
+
       return isAssignedToTech && isValidCategory;
     });
 
     console.log(`📊 TechManagement: ${selectedTech.name} has ${techTickets.length} assigned tickets`);
-    
+
     if (techTickets.length === 0) {
       console.log('🔍 Debug: No tickets found. All tickets:', tickets.map(t => ({
         id: t.id,
@@ -249,7 +249,7 @@ const Technicians = () => {
     // Calculate customer balance (total from tickets + credits - debits)
     // If no tickets, balance should be 0 regardless of transactions
     let customerBalance = 0;
-    
+
     if (techTickets.length > 0) {
       const customerTrans = customerTransactions.filter(trans => trans.technicianId === selectedTech.id);
       const credits = customerTrans.filter(t => t.type === 'credit').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
@@ -264,33 +264,33 @@ const Technicians = () => {
         const ticketDate = new Date(ticket.createdAt);
         const filterDate = new Date(selectedDate);
         return ticketDate.getFullYear() === filterDate.getFullYear() &&
-               ticketDate.getMonth() === filterDate.getMonth() &&
-               ticketDate.getDate() === filterDate.getDate();
+          ticketDate.getMonth() === filterDate.getMonth() &&
+          ticketDate.getDate() === filterDate.getDate();
       }
-      
+
       // If using start/end date range filter
       if (startDate || endDate) {
         const ticketStartDate = new Date(ticket.createdAt);
         const ticketEndDate = ticket.endDate ? new Date(ticket.endDate) : ticketStartDate;
-        
+
         let matchesRange = true;
-        
+
         // Check if ticket starts within or after the filter start date
         if (startDate) {
           const filterStartDate = new Date(startDate);
           matchesRange = matchesRange && (ticketStartDate >= filterStartDate || ticketEndDate >= filterStartDate);
         }
-        
+
         // Check if ticket ends within or before the filter end date
         if (endDate) {
           const filterEndDate = new Date(endDate);
           filterEndDate.setHours(23, 59, 59, 999); // Include the entire end date
           matchesRange = matchesRange && (ticketStartDate <= filterEndDate || ticketEndDate <= filterEndDate);
         }
-        
+
         return matchesRange;
       }
-      
+
       // No date filters applied
       return true;
     };
@@ -321,8 +321,8 @@ const Technicians = () => {
             <div className="tech-info-item">
               <span className="tech-info-label">SKILLS:</span>
               <span className="tech-info-value">
-                {Array.isArray(selectedTech.skills) 
-                  ? selectedTech.skills.join(", ") 
+                {Array.isArray(selectedTech.skills)
+                  ? selectedTech.skills.join(", ")
                   : selectedTech.skills}
               </span>
             </div>
@@ -333,8 +333,8 @@ const Technicians = () => {
               </span>
             </div>
             <div className="tech-info-item" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <button 
-                className="btn-primary" 
+              <button
+                className="btn-primary"
                 onClick={() => setShowHistory(true)}
                 style={{ padding: '8px 16px', fontSize: '0.9rem' }}
               >
@@ -348,50 +348,32 @@ const Technicians = () => {
           <div className="tickets-header">
             <div className="header-main">
               <h2>Assigned Tickets ({techTickets.length})</h2>
-              
-              <div className="view-toggle-section">
-                <label className="filter-label">View:</label>
-                <div className="view-toggle-buttons">
-                  <button
-                    className={`view-toggle-btn ${viewMode === "grid" ? "active" : ""}`}
-                    onClick={() => setViewMode("grid")}
-                  >
-                    <span className="view-icon">⊞</span>
-                    Grid
-                  </button>
-                  <button
-                    className={`view-toggle-btn ${viewMode === "table" ? "active" : ""}`}
-                    onClick={() => setViewMode("table")}
-                  >
-                    <span className="view-icon">☰</span>
-                    Table
-                  </button>
-                </div>
-              </div>
+
+
             </div>
-            
+
             <div className="filter-buttons-container">
               <div className="filter-buttons">
-                <button 
+                <button
                   className={`filter-btn ${categoryFilter === "All" ? "active" : ""}`}
                   onClick={() => setCategoryFilter("All")}
                 >
                   All
                 </button>
-                <button 
+                <button
                   className={`filter-btn ${categoryFilter === "Third Party" ? "active" : ""}`}
                   onClick={() => setCategoryFilter("Third Party")}
                 >
                   Third Party
                 </button>
-                <button 
+                <button
                   className={`filter-btn ${categoryFilter === "In Store" ? "active" : ""}`}
                   onClick={() => setCategoryFilter("In Store")}
                 >
                   In Store
                 </button>
               </div>
-              
+
               <div className="filter-controls-right">
                 <div className="status-filter">
                   <label htmlFor="statusFilter" className="filter-label">
@@ -423,7 +405,7 @@ const Technicians = () => {
                       className="date-filter-input"
                     />
                   </div>
-                  
+
                   <div className="date-filter-group">
                     <label htmlFor="endDateFilter" className="date-filter-label">
                       End Date:
@@ -437,9 +419,9 @@ const Technicians = () => {
                       className="date-filter-input"
                     />
                   </div>
-                  
+
                   {(startDate || endDate) && (
-                    <button 
+                    <button
                       className="clear-date-filter"
                       onClick={() => {
                         setStartDate("");
@@ -455,263 +437,123 @@ const Technicians = () => {
             </div>
           </div>
           {techTickets.length > 0 ? (
-            viewMode === "grid" ? (
-            <div className="tickets-grid">
-              {techTickets.map(ticket => {
-                const getPriorityColor = (priority) => {
-                  switch (priority?.toLowerCase()) {
-                    case "high": return "#dc2626";
-                    case "medium": return "#facc15";
-                    case "low": return "#16a34a";
-                    default: return "#6b7280";
-                  }
-                };
 
-                const getStatusColor = (status) => {
-                  switch (status) {
-                    case "Pending": return "#f59e0b";
-                    case "In Progress": return "#3b82f6";
-                    case "Resolved": return "#10b981";
-                    default: return "#6b7280";
-                  }
-                };
+            <div className="tickets-table-container">
+              <div className="table-responsive">
+                <table className="tickets-table">
+                  <thead>
+                    <tr>
+                      <th>Call ID</th>
+                      <th>Customer</th>
+                      <th>Product</th>
+                      <th>Category</th>
+                      <th>Created By</th>
+                      <th>Status</th>
+                      <th>Service Amount</th>
+                      <th>Commission</th>
+                      <th>Total Amount</th>
+                      <th>Start Date</th>
+                      <th>End Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {techTickets.map(ticket => {
+                      const getPriorityColor = (priority) => {
+                        switch (priority?.toLowerCase()) {
+                          case "high": return "#dc2626";
+                          case "medium": return "#facc15";
+                          case "low": return "#16a34a";
+                          default: return "#6b7280";
+                        }
+                      };
 
-                const getStatusIcon = (status) => {
-                  switch (status) {
-                    case "Pending": return "⏳";
-                    case "In Progress": return "🔄";
-                    case "Resolved": return "✅";
-                    default: return "📋";
-                  }
-                };
+                      const getStatusColor = (status) => {
+                        switch (status) {
+                          case "Pending": return "#f59e0b";
+                          case "In Progress": return "#3b82f6";
+                          case "Resolved": return "#10b981";
+                          default: return "#6b7280";
+                        }
+                      };
 
-                // Check if ticket is resolved
-                const isResolved = ticket.status === "Resolved";
+                      const getStatusIcon = (status) => {
+                        switch (status) {
+                          case "Pending": return "⏳";
+                          case "In Progress": return "🔄";
+                          case "Resolved": return "✅";
+                          default: return "📋";
+                        }
+                      };
 
-                return (
-                  <div 
-                    key={ticket.id} 
-                    className="ticket-card tech-ticket-card"
-                    style={{ 
-                      borderLeft: `4px solid ${isResolved ? "#10b981" : getPriorityColor(ticket.priority)}`
-                    }}
-                  >
-                    <div className="ticket-header">
-                      <div className="header-top">
-                        <h3 className="ticket-number">#{ticket.ticketNumber}</h3>
-                        <div 
-                          className="status-badge"
-                          style={{ 
-                            backgroundColor: isResolved ? "#10b981" : getStatusColor(ticket.status || 'Pending'),
-                            color: 'white'
-                          }}
-                        >
-                          <span className="status-icon">
-                            {isResolved ? "✅" : getStatusIcon(ticket.status || 'Pending')}
-                          </span>
-                          {ticket.status || 'Pending'}
-                        </div>
-                      </div>
-                    </div>
+                      const isResolved = ticket.status === "Resolved";
 
-                    <div className="ticket-body">
-                      <div className="info-section">
-                        <div className="info-row">
-                          <span className="info-label">CUSTOMER</span>
-                          <span className="info-value">{ticket.customerName}</span>
-                        </div>
-                        <div className="info-row">
-                          <span className="info-label">PRODUCT</span>
-                          <span className="info-value">{ticket.productName}</span>
-                        </div>
-                        {ticket.createdBy && (
-                          <div className="info-row">
-                            <span className="info-label">CREATED BY</span>
-                            <span className="info-value admin-name">👤 {ticket.createdBy}</span>
-                          </div>
-                        )}
-                        {(ticket.category === "Third Party" || ticket.category === "In Store") && ticket.serviceAmount && (
-                          <div className="info-row">
-                            <span className="info-label">SERVICE AMOUNT</span>
-                            <span className="info-value">₹{ticket.serviceAmount}</span>
-                          </div>
-                        )}
-                        {(ticket.category === "Third Party" || ticket.category === "In Store") && ticket.commissionAmount && (
-                          <div className="info-row">
-                            <span className="info-label">COMMISSION</span>
-                            <span className="info-value">₹{ticket.commissionAmount}</span>
-                          </div>
-                        )}
-                        {(ticket.category === "Third Party" || ticket.category === "In Store") && ticket.serviceAmount && ticket.commissionAmount && (
-                          <div className="info-row">
-                            <span className="info-label" style={{ fontSize: '0.65rem' }}>
-                              {ticket.category === "In Store" 
-                                ? "TOTAL AMT (IN STORE)" 
-                                : "TOTAL AMT (THIRD PARTY)"}
-                            </span>
-                            <span className="info-value" style={{ fontWeight: 700, color: '#16a34a' }}>
-                              ₹{(parseFloat(ticket.serviceAmount) - parseFloat(ticket.commissionAmount)).toFixed(2)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="meta-section">
-                        <div className="priority-info">
-                          <div className="meta-dates">
-                            <div className="start-date">
-                              <span className="date-label">Start:</span>
-                              <span className="date-value">
-                                {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('en-GB', { 
-                                  day: '2-digit', 
-                                  month: '2-digit', 
-                                  year: 'numeric' 
-                                }) : 'N/A'}
-                              </span>
-                            </div>
-                            {ticket.endDate && (
-                              <div className="end-date">
-                                <span className="date-label">End:</span>
-                                <span className="date-value">
-                                  {new Date(ticket.endDate).toLocaleDateString('en-GB', { 
-                                    day: '2-digit', 
-                                    month: '2-digit', 
-                                    year: 'numeric' 
-                                  })}
-                                </span>
-                              </div>
+                      return (
+                        <tr key={ticket.id}>
+                          <td className="ticket-number-cell">#{ticket.callId || ticket.ticketNumber}</td>
+                          <td>{ticket.customerName}</td>
+                          <td>{ticket.productName}</td>
+                          <td>
+                            <span className="meta-category">{ticket.category || 'Third Party'}</span>
+                          </td>
+                          <td>
+                            {ticket.createdBy ? (
+                              <span className="admin-name-table">👤 {ticket.createdBy}</span>
+                            ) : (
+                              <span className="admin-name-table unknown">Unknown</span>
                             )}
-                          </div>
-                        </div>
-                        <div className="assigned-info">
-                          <span className="meta-label">ASSIGNED TO</span>
-                          <span className="meta-value">{ticket.subOption || ticket.assignedTo || "Unassigned"}</span>
-                          <span className="meta-category">{ticket.category || 'Third Party'}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            ) : (
-              <div className="tickets-table-container">
-                <div className="table-responsive">
-                  <table className="tickets-table">
-                    <thead>
-                      <tr>
-                        <th>Ticket #</th>
-                        <th>Customer</th>
-                        <th>Product</th>
-                        <th>Category</th>
-                        <th>Created By</th>
-                        <th>Status</th>
-                        <th>Service Amount</th>
-                        <th>Commission</th>
-                        <th>Total Amount</th>
-                        <th>Start Date</th>
-                        <th>End Date</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {techTickets.map(ticket => {
-                        const getPriorityColor = (priority) => {
-                          switch (priority?.toLowerCase()) {
-                            case "high": return "#dc2626";
-                            case "medium": return "#facc15";
-                            case "low": return "#16a34a";
-                            default: return "#6b7280";
-                          }
-                        };
-
-                        const getStatusColor = (status) => {
-                          switch (status) {
-                            case "Pending": return "#f59e0b";
-                            case "In Progress": return "#3b82f6";
-                            case "Resolved": return "#10b981";
-                            default: return "#6b7280";
-                          }
-                        };
-
-                        const getStatusIcon = (status) => {
-                          switch (status) {
-                            case "Pending": return "⏳";
-                            case "In Progress": return "🔄";
-                            case "Resolved": return "✅";
-                            default: return "📋";
-                          }
-                        };
-
-                        const isResolved = ticket.status === "Resolved";
-
-                        return (
-                          <tr key={ticket.id}>
-                            <td className="ticket-number-cell">#{ticket.ticketNumber}</td>
-                            <td>{ticket.customerName}</td>
-                            <td>{ticket.productName}</td>
-                            <td>
-                              <span className="meta-category">{ticket.category || 'Third Party'}</span>
-                            </td>
-                            <td>
-                              {ticket.createdBy ? (
-                                <span className="admin-name-table">👤 {ticket.createdBy}</span>
-                              ) : (
-                                <span className="admin-name-table unknown">Unknown</span>
-                              )}
-                            </td>
-                            <td>
-                              <div 
-                                className="status-badge-small" 
-                                style={{ 
-                                  backgroundColor: isResolved ? "#10b981" : getStatusColor(ticket.status || 'Pending'),
-                                  color: 'white'
-                                }}
-                              >
-                                <span className="status-icon">
-                                  {isResolved ? "✅" : getStatusIcon(ticket.status || 'Pending')}
-                                </span>
-                                {ticket.status || 'Pending'}
-                              </div>
-                            </td>
-                            <td>
-                              {(ticket.category === "Third Party" || ticket.category === "In Store") && ticket.serviceAmount 
-                                ? `₹${ticket.serviceAmount}` 
-                                : '-'}
-                            </td>
-                            <td>
-                              {(ticket.category === "Third Party" || ticket.category === "In Store") && ticket.commissionAmount 
-                                ? `₹${ticket.commissionAmount}` 
-                                : '-'}
-                            </td>
-                            <td>
-                              {(ticket.category === "Third Party" || ticket.category === "In Store") && ticket.serviceAmount && ticket.commissionAmount 
-                                ? <span style={{ fontWeight: 700, color: '#16a34a' }}>
-                                    ₹{(parseFloat(ticket.serviceAmount) - parseFloat(ticket.commissionAmount)).toFixed(2)}
-                                  </span>
-                                : '-'}
-                            </td>
-                            <td>
-                              {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('en-GB', { 
-                                day: '2-digit', 
-                                month: '2-digit', 
-                                year: 'numeric' 
-                              }) : 'N/A'}
-                            </td>
-                            <td>
-                              {ticket.endDate ? new Date(ticket.endDate).toLocaleDateString('en-GB', { 
-                                day: '2-digit', 
-                                month: '2-digit', 
-                                year: 'numeric' 
-                              }) : 'Not set'}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                          </td>
+                          <td>
+                            <div
+                              className="status-badge-small"
+                              style={{
+                                backgroundColor: isResolved ? "#10b981" : getStatusColor(ticket.status || 'Pending'),
+                                color: 'white'
+                              }}
+                            >
+                              <span className="status-icon">
+                                {isResolved ? "✅" : getStatusIcon(ticket.status || 'Pending')}
+                              </span>
+                              {ticket.status || 'Pending'}
+                            </div>
+                          </td>
+                          <td>
+                            {(ticket.category === "Third Party" || ticket.category === "In Store") && ticket.serviceAmount
+                              ? `₹${ticket.serviceAmount}`
+                              : '-'}
+                          </td>
+                          <td>
+                            {(ticket.category === "Third Party" || ticket.category === "In Store") && ticket.commissionAmount
+                              ? `₹${ticket.commissionAmount}`
+                              : '-'}
+                          </td>
+                          <td>
+                            {(ticket.category === "Third Party" || ticket.category === "In Store") && ticket.serviceAmount && ticket.commissionAmount
+                              ? <span style={{ fontWeight: 700, color: '#16a34a' }}>
+                                ₹{(parseFloat(ticket.serviceAmount) - parseFloat(ticket.commissionAmount)).toFixed(2)}
+                              </span>
+                              : '-'}
+                          </td>
+                          <td>
+                            {ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString('en-GB', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric'
+                            }) : 'N/A'}
+                          </td>
+                          <td>
+                            {ticket.endDate ? new Date(ticket.endDate).toLocaleDateString('en-GB', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric'
+                            }) : 'Not set'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            )
+            </div>
           ) : (
             <div className="empty-state">
               <p>No tickets assigned to this technician yet.</p>
@@ -771,8 +613,8 @@ const Technicians = () => {
         <div className="search-stats">
           <span>
             Found {filteredTechs.length} technician
-              {filteredTechs.length !== 1 ? "s" : ""}
-            </span>
+            {filteredTechs.length !== 1 ? "s" : ""}
+          </span>
         </div>
       )}
 
@@ -793,7 +635,7 @@ const Technicians = () => {
                   </thead>
                   <tbody>
                     {filteredTechs.map((tech) => (
-                      <tr 
+                      <tr
                         key={tech.id}
                         className="service-table-row"
                         onClick={() => handleTechClick(tech)}
@@ -838,8 +680,8 @@ const Technicians = () => {
             {isMobile && (
               <div className="services-cards">
                 {filteredTechs.map((tech) => (
-                  <div 
-                    key={tech.id} 
+                  <div
+                    key={tech.id}
                     className="service-card clickable-service-card"
                     onClick={() => handleTechClick(tech)}
                   >

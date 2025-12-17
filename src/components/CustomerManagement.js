@@ -14,7 +14,7 @@ const CustomerManagement = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams();
-  
+
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
   const [tickets, setTickets] = useState([]);
@@ -28,13 +28,13 @@ const CustomerManagement = () => {
   const [ticketProductData, setTicketProductData] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, type: '', id: null });
   const { notification, showNotification, hideNotification } = useNotification();
-  const [viewMode, setViewMode] = useState("grid"); // "grid" or "table"
-  
+
+
   // Determine view from URL path
   const pathParts = location.pathname.split('/').filter(Boolean);
   const customerId = pathParts[1]; // /customers/:customerId
   const productId = pathParts[3]; // /customers/:customerId/products/:productId
-  
+
   const selectedCustomer = customerId ? customers.find(c => c.id === customerId) : null;
   const selectedProduct = productId ? products.find(p => p.id === productId) : null;
   const [formData, setFormData] = useState({
@@ -62,7 +62,7 @@ const CustomerManagement = () => {
     };
 
     window.addEventListener('resize', handleResize);
-    
+
     return () => {
       window.removeEventListener('resize', handleResize);
       unsubscribe();
@@ -79,7 +79,7 @@ const CustomerManagement = () => {
       }));
       setProducts(productsArray);
     });
-    
+
     return () => unsubscribe();
   }, []);
 
@@ -93,18 +93,18 @@ const CustomerManagement = () => {
         const usersSnapshot = await getDocs(usersRef);
         const allTickets = [];
         const seenTicketIds = new Set(); // Track seen ticket IDs to prevent duplicates
-        
+
         for (const userDoc of usersSnapshot.docs) {
           const userTicketsRef = collection(db, 'mainData', 'Billuload', 'users', userDoc.id, 'tickets');
           const ticketsSnapshot = await getDocs(userTicketsRef);
-          
+
           console.log(`📂 CustomerManagement - Found ${ticketsSnapshot.docs.length} tickets for user ${userDoc.id}`);
-          
+
           ticketsSnapshot.docs.forEach(ticketDoc => {
             const rawTicketData = ticketDoc.data();
             // Only add ticket if we haven't seen this ticket number before (more reliable than ID)
             const ticketIdentifier = rawTicketData.ticketNumber || ticketDoc.id;
-            
+
             if (!seenTicketIds.has(ticketIdentifier)) {
               seenTicketIds.add(ticketIdentifier);
               const ticketData = {
@@ -132,7 +132,7 @@ const CustomerManagement = () => {
             }
           });
         }
-        
+
         console.log(`✅ CustomerManagement - Total unique tickets loaded: ${allTickets.length}`);
         setTickets(allTickets);
         setIsLoadingTickets(false);
@@ -142,10 +142,10 @@ const CustomerManagement = () => {
         setIsLoadingTickets(false);
       }
     };
-    
+
     // Initial fetch
     fetchAllUserTickets();
-    
+
     // No auto-refresh interval to improve performance
     // Users can manually refresh the page to see new tickets
   }, []);
@@ -232,7 +232,7 @@ const CustomerManagement = () => {
 
   const filteredCustomers = customers.filter(customer => {
     if (!searchTerm) return true; // Show all if no search term
-    
+
     const searchLower = searchTerm.toLowerCase();
     return (
       customer.name?.toLowerCase().includes(searchLower) ||
@@ -247,7 +247,7 @@ const CustomerManagement = () => {
     // Clear localStorage to ensure empty form
     localStorage.removeItem('customerFormData');
     localStorage.removeItem('tempProducts');
-    
+
     // Reset form data to clear previous values
     setFormData({
       name: '',
@@ -340,7 +340,7 @@ const CustomerManagement = () => {
   // Show AddCustomer component when showAddCustomer is true
   if (showAddCustomer) {
     return (
-      <AddCustomer 
+      <AddCustomer
         onBack={handleBackToCustomerList}
       />
     );
@@ -349,7 +349,7 @@ const CustomerManagement = () => {
   // Show AddTicket component when showAddTicket is true
   if (showAddTicket && ticketProductData) {
     return (
-      <AddTicket 
+      <AddTicket
         onBack={handleBackFromTicket}
         onTicketAdded={handleTicketAdded}
         prefilledData={{
@@ -374,20 +374,20 @@ const CustomerManagement = () => {
       productId: selectedProduct.id,
       productName: selectedProduct.name || selectedProduct.productName,
       totalTickets: tickets.length,
-      allTickets: tickets.map(t => ({ 
-        id: t.id, 
-        productId: t.productId, 
+      allTickets: tickets.map(t => ({
+        id: t.id,
+        productId: t.productId,
         productName: t.productName,
         customerId: t.customerId,
         customerName: t.customerName
       }))
     });
-    
+
     const productTickets = tickets.filter(ticket => {
       const matchById = ticket.productId === selectedProduct.id;
       const matchByName = ticket.productName === (selectedProduct.name || selectedProduct.productName);
       const matchBySerialNumber = ticket.serialNumber === selectedProduct.serialNumber;
-      
+
       console.log('🎫 Checking ticket:', {
         ticketId: ticket.id,
         ticketProductId: ticket.productId,
@@ -400,10 +400,10 @@ const CustomerManagement = () => {
         matchByName,
         matchBySerialNumber
       });
-      
+
       return matchById || matchByName || matchBySerialNumber;
     });
-    
+
     console.log('✅ CustomerManagement - Filtered tickets:', productTickets.length);
 
     return (
@@ -431,26 +431,8 @@ const CustomerManagement = () => {
         <div className="products-section-header">
           <div className="header-main">
             <h2>Product Tickets ({productTickets.length})</h2>
-            
-            <div className="view-toggle-section">
-              <label className="filter-label">View:</label>
-              <div className="view-toggle-buttons">
-                <button
-                  className={`view-toggle-btn ${viewMode === "grid" ? "active" : ""}`}
-                  onClick={() => setViewMode("grid")}
-                >
-                  <span className="view-icon">⊞</span>
-                  Grid
-                </button>
-                <button
-                  className={`view-toggle-btn ${viewMode === "table" ? "active" : ""}`}
-                  onClick={() => setViewMode("table")}
-                >
-                  <span className="view-icon">☰</span>
-                  Table
-                </button>
-              </div>
-            </div>
+
+
           </div>
         </div>
 
@@ -459,125 +441,63 @@ const CustomerManagement = () => {
           {isLoadingTickets ? (
             <Loader message="Loading product tickets..." size="medium" />
           ) : productTickets.length > 0 ? (
-            viewMode === "grid" ? (
-            <div className="tickets-grid">
-              {productTickets.map(ticket => (
-                <div key={ticket.id} className="ticket-card">
-                  <div className="ticket-header">
-                    <div className="header-top">
-                      <h3 className="ticket-number">#{ticket.ticketNumber}</h3>
-                      <div 
-                        className="status-badge" 
-                        style={{ backgroundColor: getStatusColor(ticket.status) }}
-                      >
-                        <span className="status-icon">{getStatusIcon(ticket.status)}</span>
-                        {ticket.status}
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="ticket-body">
-                    <div className="info-section">
-                      <div className="info-row">
-                        <span className="info-label">Customer</span>
-                        <span className="info-value">{ticket.customerName}</span>
-                      </div>
-                      <div className="info-row">
-                        <span className="info-label">Product</span>
-                        <span className="info-value">{ticket.productName}</span>
-                      </div>
-                      {ticket.serialNumber && (
-                        <div className="info-row">
-                          <span className="info-label">Serial Number</span>
-                          <span className="info-value">{ticket.serialNumber}</span>
-                        </div>
-                      )}
-                      {ticket.createdBy && (
-                        <div className="info-row">
-                          <span className="info-label">Created By</span>
-                          <span className="info-value admin-name">👤 {ticket.createdBy}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="meta-section">
-                      <div className="priority-info">
-                        <span className="meta-date">
-                          {new Date(ticket.createdAt).toLocaleDateString('en-GB', { 
-                            day: '2-digit', 
-                            month: '2-digit', 
-                            year: 'numeric' 
+            <div className="tickets-table-container">
+              <div className="table-responsive">
+                <table className="tickets-table">
+                  <thead>
+                    <tr>
+                      <th>Call ID</th>
+                      <th>Customer</th>
+                      <th>Product</th>
+                      <th>Serial Number</th>
+                      <th>Category</th>
+                      <th>Created By</th>
+                      <th>Status</th>
+                      <th>Assigned To</th>
+                      <th>Created Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productTickets.map(ticket => (
+                      <tr key={ticket.id}>
+                        <td className="ticket-number-cell">#{ticket.callId || ticket.ticketNumber}</td>
+                        <td>{ticket.customerName}</td>
+                        <td>{ticket.productName}</td>
+                        <td>{ticket.serialNumber || '-'}</td>
+                        <td>
+                          <span className="meta-category">{ticket.category}</span>
+                        </td>
+                        <td>
+                          {ticket.createdBy ? (
+                            <span className="admin-name-table">👤 {ticket.createdBy}</span>
+                          ) : (
+                            <span className="admin-name-table unknown">Unknown</span>
+                          )}
+                        </td>
+                        <td>
+                          <div
+                            className="status-badge-small"
+                            style={{ backgroundColor: getStatusColor(ticket.status) }}
+                          >
+                            <span className="status-icon">{getStatusIcon(ticket.status)}</span>
+                            {ticket.status}
+                          </div>
+                        </td>
+                        <td>{ticket.subOption || ticket.assignedTo || 'Unassigned'}</td>
+                        <td>
+                          {new Date(ticket.createdAt).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
                           })}
-                        </span>
-                      </div>
-                      <div className="assigned-info">
-                        <span className="meta-label">Assigned To</span>
-                        <span className="meta-value">{ticket.subOption || ticket.assignedTo || 'Unassigned'}</span>
-                        <span className="meta-category">{ticket.category}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            ) : (
-              <div className="tickets-table-container">
-                <div className="table-responsive">
-                  <table className="tickets-table">
-                    <thead>
-                      <tr>
-                        <th>Ticket #</th>
-                        <th>Customer</th>
-                        <th>Product</th>
-                        <th>Serial Number</th>
-                        <th>Category</th>
-                        <th>Created By</th>
-                        <th>Status</th>
-                        <th>Assigned To</th>
-                        <th>Created Date</th>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {productTickets.map(ticket => (
-                        <tr key={ticket.id}>
-                          <td className="ticket-number-cell">#{ticket.ticketNumber}</td>
-                          <td>{ticket.customerName}</td>
-                          <td>{ticket.productName}</td>
-                          <td>{ticket.serialNumber || '-'}</td>
-                          <td>
-                            <span className="meta-category">{ticket.category}</span>
-                          </td>
-                          <td>
-                            {ticket.createdBy ? (
-                              <span className="admin-name-table">👤 {ticket.createdBy}</span>
-                            ) : (
-                              <span className="admin-name-table unknown">Unknown</span>
-                            )}
-                          </td>
-                          <td>
-                            <div 
-                              className="status-badge-small" 
-                              style={{ backgroundColor: getStatusColor(ticket.status) }}
-                            >
-                              <span className="status-icon">{getStatusIcon(ticket.status)}</span>
-                              {ticket.status}
-                            </div>
-                          </td>
-                          <td>{ticket.subOption || ticket.assignedTo || 'Unassigned'}</td>
-                          <td>
-                            {new Date(ticket.createdAt).toLocaleDateString('en-GB', { 
-                              day: '2-digit', 
-                              month: '2-digit', 
-                              year: 'numeric' 
-                            })}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            )
+            </div>
           ) : (
             <div className="empty-state">
               <div className="empty-icon">🎫</div>
@@ -599,7 +519,7 @@ const CustomerManagement = () => {
 
   // Show Customer Products when a customer is selected
   if (selectedCustomer) {
-    const customerProducts = products.filter(product => 
+    const customerProducts = products.filter(product =>
       product.customerId === selectedCustomer.id
     );
 
@@ -678,20 +598,20 @@ const CustomerManagement = () => {
                           )}
                           {customerProducts.some(p => p.purchaseDate) && (
                             <td style={{ cursor: 'pointer' }} onClick={() => handleProductClick(product)}>
-                              {product.purchaseDate 
-                                ? new Date(product.purchaseDate).toLocaleDateString() 
+                              {product.purchaseDate
+                                ? new Date(product.purchaseDate).toLocaleDateString()
                                 : '-'}
                             </td>
                           )}
                           {customerProducts.some(p => p.warrantyExpiry) && (
                             <td style={{ cursor: 'pointer' }} onClick={() => handleProductClick(product)}>
-                              {product.warrantyExpiry 
-                                ? new Date(product.warrantyExpiry).toLocaleDateString() 
+                              {product.warrantyExpiry
+                                ? new Date(product.warrantyExpiry).toLocaleDateString()
                                 : '-'}
                             </td>
                           )}
                           <td>
-                            <button 
+                            <button
                               className="btn-primary"
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -729,7 +649,7 @@ const CustomerManagement = () => {
                           </div>
                         </div>
                       </div>
-                      
+
                       <div className="card-content">
                         <div className="product-row">
                           <div className="product-info">
@@ -738,9 +658,9 @@ const CustomerManagement = () => {
                             <div className="product-serial">SN: {product.serialNumber || 'N/A'}</div>
                           </div>
                         </div>
-                        
+
                         <div className="product-row" style={{ borderBottom: 'none', paddingTop: '16px' }}>
-                          <button 
+                          <button
                             className="raise-ticket-btn"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -780,11 +700,11 @@ const CustomerManagement = () => {
       <div className="customer-header">
         <h1>Customer Management</h1>
         <div className="header-actions">
-          <button 
+          <button
             className="btn-primary add-customer-btn"
             onClick={handleShowAddCustomer}
           >
-            <span className="btn-icon">+</span> 
+            <span className="btn-icon">+</span>
             <span className="btn-text">Add New Customer</span>
           </button>
         </div>
@@ -803,7 +723,7 @@ const CustomerManagement = () => {
           />
         </div>
         {searchTerm && (
-          <button 
+          <button
             className="clear-search-btn"
             onClick={() => setSearchTerm('')}
           >
@@ -824,54 +744,54 @@ const CustomerManagement = () => {
               <div className="form-grid">
                 <div className="form-group">
                   <label>Customer Name *</label>
-                  <input 
-                    type="text" 
-                    name="name" 
-                    value={formData.name} 
-                    onChange={handleInputChange} 
-                    required 
-                    placeholder="Enter customer name" 
+                  <input
+                    type="text"
+                    name="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Enter customer name"
                   />
                 </div>
                 <div className="form-group">
                   <label>Mobile Number *</label>
-                  <input 
-                    type="tel" 
-                    name="phone" 
-                    value={formData.phone} 
-                    onChange={handleInputChange} 
-                    required 
-                    placeholder="Enter mobile number" 
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Enter mobile number"
                   />
                 </div>
                 <div className="form-group">
                   <label>WhatsApp Number</label>
-                  <input 
-                    type="tel" 
-                    name="whatsapp" 
-                    value={formData.whatsapp} 
-                    onChange={handleInputChange} 
-                    placeholder="Enter WhatsApp number" 
+                  <input
+                    type="tel"
+                    name="whatsapp"
+                    value={formData.whatsapp}
+                    onChange={handleInputChange}
+                    placeholder="Enter WhatsApp number"
                   />
                 </div>
                 <div className="form-group">
                   <label>Contact Person</label>
-                  <input 
-                    type="text" 
-                    name="contactPerson" 
-                    value={formData.contactPerson} 
-                    onChange={handleInputChange} 
-                    placeholder="Enter contact person" 
+                  <input
+                    type="text"
+                    name="contactPerson"
+                    value={formData.contactPerson}
+                    onChange={handleInputChange}
+                    placeholder="Enter contact person"
                   />
                 </div>
                 <div className="form-group full-width">
                   <label>Address</label>
-                  <textarea 
-                    name="address" 
-                    value={formData.address} 
-                    onChange={handleInputChange} 
-                    rows="3" 
-                    placeholder="Enter customer address" 
+                  <textarea
+                    name="address"
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    rows="3"
+                    placeholder="Enter customer address"
                   />
                 </div>
               </div>
@@ -929,16 +849,16 @@ const CustomerManagement = () => {
                         <td>{customer.joinDate ? new Date(customer.joinDate).toLocaleDateString() : 'N/A'}</td>
                         <td>
                           <div className="action-buttons">
-                            <button 
-                              className="btn-action btn-edit" 
+                            <button
+                              className="btn-action btn-edit"
                               onClick={() => handleEdit(customer)}
                               title="Edit customer"
                             >
                               <span className="action-icon">✏️</span>
                               <span className="action-text"></span>
                             </button>
-                            <button 
-                              className="btn-action btn-delete" 
+                            <button
+                              className="btn-action btn-delete"
                               onClick={() => handleDelete(customer.id, customer.name)}
                               title="Delete customer"
                             >
@@ -969,21 +889,21 @@ const CustomerManagement = () => {
                         </div>
                       </div>
                       <div className="card-actions">
-                        <button 
-                          className="btn-action btn-edit" 
+                        <button
+                          className="btn-action btn-edit"
                           onClick={() => handleEdit(customer)}
                         >
                           <span className="action-icon">✏️</span>
                         </button>
-                        <button 
-                          className="btn-action btn-delete" 
+                        <button
+                          className="btn-action btn-delete"
                           onClick={() => handleDelete(customer.id, customer.name)}
                         >
                           <span className="action-icon">🗑️</span>
                         </button>
                       </div>
                     </div>
-                    
+
                     <div className="card-content">
                       <div className="card-section">
                         <h4>Contact Information</h4>
@@ -993,12 +913,12 @@ const CustomerManagement = () => {
                           {customer.contactPerson && <div className="contact-item">👤 {customer.contactPerson}</div>}
                         </div>
                       </div>
-                      
+
                       <div className="card-section">
                         <h4>Address</h4>
                         <p>{customer.address || 'No address provided'}</p>
                       </div>
-                      
+
                       <div className="card-footer">
                         <div className="join-date">
                           <span className="date-label">Joined:</span>
@@ -1016,7 +936,7 @@ const CustomerManagement = () => {
             <div className="empty-icon">👥</div>
             <h3>No customers found</h3>
             <p>
-              {searchTerm 
+              {searchTerm
                 ? `No customers match "${searchTerm}". Try a different search.`
                 : "Get started by adding your first customer."
               }
@@ -1024,7 +944,7 @@ const CustomerManagement = () => {
           </div>
         )}
       </div>
-      
+
       <Notification
         message={notification.message}
         type={notification.type}

@@ -11,24 +11,13 @@ import { parsePdfToData } from '../utils/pdfParser';
 import './AddCustomer.css';
 
 const AddCustomer = ({ onBack }) => {
-  const [formData, setFormData] = useState(() => {
-    // Load form data from localStorage on mount
-    try {
-      const saved = localStorage.getItem('customerFormData');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (error) {
-      console.error('Error loading form data from localStorage:', error);
-    }
-    return {
-      name: '',
-      phone: '',
-      whatsapp: '',
-      contactPerson: '',
-      address: '',
-      joinDate: ''
-    };
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    whatsapp: '',
+    contactPerson: '',
+    address: '',
+    joinDate: ''
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,61 +29,33 @@ const AddCustomer = ({ onBack }) => {
   const [allProducts, setAllProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [editingProduct, setEditingProduct] = useState(null);
-  const [tempProducts, setTempProducts] = useState(() => {
-    // Load temp products from localStorage on mount
-    try {
-      const saved = localStorage.getItem('tempProducts');
-      return saved ? JSON.parse(saved) : [];
-    } catch (error) {
-      console.error('Error loading temp products from localStorage:', error);
-      return [];
-    }
-  });
+  const [tempProducts, setTempProducts] = useState([]);
   const [isUploadingBill, setIsUploadingBill] = useState(false);
   const [hasAutoFilledData, setHasAutoFilledData] = useState(false);
   const { notification, showNotification, hideNotification } = useNotification();
 
-  // Show notification if data was restored from localStorage
+  // Clear form data on component mount to ensure fresh start
   useEffect(() => {
-    const hasRestoredData = (formData.name || formData.phone || formData.address) || tempProducts.length > 0;
-    if (hasRestoredData) {
-      const restoredItems = [];
-      if (formData.name || formData.phone) restoredItems.push('customer info');
-      if (tempProducts.length > 0) restoredItems.push(`${tempProducts.length} product(s)`);
-      
-      if (restoredItems.length > 0) {
-        showNotification(`📂 Restored unsaved data: ${restoredItems.join(', ')}`, 'info');
-      }
-    }
+    // Clear localStorage and reset form when component mounts
+    localStorage.removeItem('customerFormData');
+    localStorage.removeItem('tempProducts');
+
+    // Reset form data
+    setFormData({
+      name: '',
+      phone: '',
+      whatsapp: '',
+      contactPerson: '',
+      address: '',
+      joinDate: ''
+    });
+
+    // Reset temp products
+    setTempProducts([]);
+
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
 
-  // Save form data to localStorage whenever it changes
-  useEffect(() => {
-    try {
-      const hasData = formData.name || formData.phone || formData.address;
-      if (hasData && !addedCustomer) {
-        localStorage.setItem('customerFormData', JSON.stringify(formData));
-        console.log('💾 Saved customer form data to localStorage');
-      }
-    } catch (error) {
-      console.error('Error saving form data to localStorage:', error);
-    }
-  }, [formData, addedCustomer]);
-
-  // Save temp products to localStorage whenever they change
-  useEffect(() => {
-    try {
-      if (tempProducts.length > 0) {
-        localStorage.setItem('tempProducts', JSON.stringify(tempProducts));
-        console.log('💾 Saved', tempProducts.length, 'temp products to localStorage');
-      } else {
-        localStorage.removeItem('tempProducts');
-      }
-    } catch (error) {
-      console.error('Error saving temp products to localStorage:', error);
-    }
-  }, [tempProducts]);
 
   // Fetch products (for existing customers)
   useEffect(() => {
@@ -156,10 +117,10 @@ const AddCustomer = ({ onBack }) => {
 
         if (extractedData.products && extractedData.products.length > 0) {
           console.log('🔍 Raw extracted products:', extractedData.products);
-          
+
           const realProducts = extractedData.products.map((product, index) => {
             console.log(`🔍 Processing product ${index + 1}:`, product);
-            
+
             return {
               name: product.name || product.productName || `Product ${index + 1}`,
               companyName: product.companyName || extractedData.company?.name || 'Unknown Company',
@@ -183,10 +144,10 @@ const AddCustomer = ({ onBack }) => {
 
           console.log('🟢 Processed products for display:', realProducts);
           setTempProducts(realProducts);
-          
+
           // Check if products need manual entry
           const needsManualEntry = realProducts.some(p => p.needsManualEntry || p.price === 0);
-          
+
           if (needsManualEntry) {
             showNotification(`${realProducts.length} product template(s) created. Please edit to add correct details.`, 'warning');
           } else {
@@ -221,7 +182,7 @@ const AddCustomer = ({ onBack }) => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    
+
     // Validate and format phone numbers (only digits, max 10)
     if (name === 'phone' || name === 'whatsapp') {
       const digitsOnly = value.replace(/\D/g, '');
@@ -229,24 +190,24 @@ const AddCustomer = ({ onBack }) => {
       setFormData(prev => ({ ...prev, [name]: limitedDigits }));
       return;
     }
-    
+
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.name || !formData.phone) {
       showNotification('Please fill in all required fields (Name and Phone)', 'error');
       return;
     }
-    
+
     // Validate phone number (exactly 10 digits)
     if (formData.phone.length !== 10) {
       showNotification('Mobile number must be exactly 10 digits', 'error');
       return;
     }
-    
+
     // Validate WhatsApp number if provided
     if (formData.whatsapp && formData.whatsapp.length !== 10) {
       showNotification('WhatsApp number must be exactly 10 digits', 'error');
@@ -255,16 +216,16 @@ const AddCustomer = ({ onBack }) => {
 
     setIsSubmitting(true);
     try {
-      const customerData = { 
-        ...formData, 
+      const customerData = {
+        ...formData,
         joinDate: new Date().toISOString(),
         productCount: tempProducts.length
       };
-      
+
       const customersRef = getCollectionRef('customers');
       const newCustomerRef = await addDoc(customersRef, customerData);
       const savedCustomer = { id: newCustomerRef.id, ...customerData };
-      
+
       if (tempProducts.length > 0) {
         const productsRef = getCollectionRef('products');
         const productPromises = tempProducts
@@ -302,36 +263,36 @@ const AddCustomer = ({ onBack }) => {
               total: Number(product.total) || Number(product.amount) || 0,
               gst: Number(product.gst) || 18,
               unit: product.unit || 'nos',
-              
+
               // Customer relationship
               customerId: savedCustomer.id,
               customerName: savedCustomer.name,
               createdAt: new Date().toISOString()
             };
-            
+
             // Remove any undefined values
             Object.keys(productData).forEach(key => {
               if (productData[key] === undefined || productData[key] === null) {
                 delete productData[key];
               }
             });
-            
+
             console.log('💾 Saving clean product data:', productData);
             return addDoc(productsRef, productData);
           });
-        
+
         await Promise.all(productPromises);
       }
-      
+
       setAddedCustomer(savedCustomer);
       // Clear localStorage after successful save
       localStorage.removeItem('tempProducts');
       localStorage.removeItem('customerFormData');
       showNotification(`Customer "${savedCustomer.name}" added successfully with ${tempProducts.length} products!`, 'success');
-      
+
     } catch (error) {
       console.error('Error adding customer:', error);
-      
+
       if (error.code === 'unavailable' || error.message.includes('ERR_INTERNET_DISCONNECTED')) {
         showNotification('No internet connection. Data will be saved when you reconnect.', 'warning');
       } else if (error.code === 'permission-denied') {
@@ -376,7 +337,7 @@ const AddCustomer = ({ onBack }) => {
     setTempProducts(prev => [...prev, newProduct]);
     setShowAddProduct(false);
     showNotification('Product added successfully!', 'success');
-    
+
     // Scroll to top to show customer form with products
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -422,9 +383,9 @@ const AddCustomer = ({ onBack }) => {
 
   const handleUpdateProduct = async (updatedProductData) => {
     if (editingProduct.tempId) {
-      setTempProducts(prev => 
-        prev.map(product => 
-          product.tempId === editingProduct.tempId 
+      setTempProducts(prev =>
+        prev.map(product =>
+          product.tempId === editingProduct.tempId
             ? { ...updatedProductData, tempId: editingProduct.tempId }
             : product
         )
@@ -476,7 +437,7 @@ const AddCustomer = ({ onBack }) => {
     }
   };
 
-  const customerProducts = addedCustomer 
+  const customerProducts = addedCustomer
     ? allProducts.filter(product => product.customerId === addedCustomer?.id)
     : [];
 
@@ -548,8 +509,8 @@ const AddCustomer = ({ onBack }) => {
               onBack={handleCloseTicket}
               onTicketAdded={handleTicketAdded}
               productData={selectedProduct}
-              customer={addedCustomer || { 
-                id: 'temp', 
+              customer={addedCustomer || {
+                id: 'temp',
                 name: formData.name || 'Customer',
                 phone: formData.phone || '',
                 address: formData.address || ''
@@ -568,8 +529,8 @@ const AddCustomer = ({ onBack }) => {
               <button className="close-btn" onClick={handleCloseBillGenerator}>×</button>
             </div>
             <BillGenerator
-              customer={addedCustomer || { 
-                id: 'temp', 
+              customer={addedCustomer || {
+                id: 'temp',
                 name: formData.name || 'Customer',
                 phone: formData.phone || '',
                 address: formData.address || '',
@@ -600,7 +561,7 @@ const AddCustomer = ({ onBack }) => {
       <div className="add-customer-container">
         <div className="add-customer-card">
           <form onSubmit={handleSubmit}>
-            
+
             {/* CUSTOMER FORM FIELDS */}
             <div className="form-section">
               <div className="section-header">
@@ -623,74 +584,74 @@ const AddCustomer = ({ onBack }) => {
               <div className="form-grid">
                 <div className="form-group">
                   <label>Customer Name *</label>
-                  <input 
-                    type="text" 
-                    name="name" 
+                  <input
+                    type="text"
+                    name="name"
                     value={formData.name}
-                    onChange={handleInputChange} 
-                    required 
-                    placeholder="Enter customer name" 
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Enter customer name"
                     disabled={addedCustomer}
                   />
                 </div>
                 <div className="form-group">
                   <label>Mobile Number *</label>
-                  <input 
-                    type="tel" 
-                    name="phone" 
-                    value={formData.phone} 
-                    onChange={handleInputChange} 
-                    required 
-                    placeholder="Enter 10 digit mobile number" 
+                  <input
+                    type="tel"
+                    name="phone"
+                    value={formData.phone}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="Enter 10 digit mobile number"
                     pattern="[0-9]{10}"
                     maxLength="10"
                     title="Please enter exactly 10 digits"
                     disabled={addedCustomer}
                   />
                   {formData.phone && formData.phone.length !== 10 && (
-                    <small style={{color: '#ef4444', display: 'block', marginTop: '0.25rem'}}>
+                    <small style={{ color: '#ef4444', display: 'block', marginTop: '0.25rem' }}>
                       Must be 10 digits
                     </small>
                   )}
                 </div>
                 <div className="form-group">
                   <label>WhatsApp Number</label>
-                  <input 
-                    type="tel" 
-                    name="whatsapp" 
-                    value={formData.whatsapp} 
-                    onChange={handleInputChange} 
-                    placeholder="Enter 10 digit WhatsApp number" 
+                  <input
+                    type="tel"
+                    name="whatsapp"
+                    value={formData.whatsapp}
+                    onChange={handleInputChange}
+                    placeholder="Enter 10 digit WhatsApp number"
                     pattern="[0-9]{10}"
                     maxLength="10"
                     title="Please enter exactly 10 digits"
                     disabled={addedCustomer}
                   />
                   {formData.whatsapp && formData.whatsapp.length !== 10 && (
-                    <small style={{color: '#ef4444', display: 'block', marginTop: '0.25rem'}}>
+                    <small style={{ color: '#ef4444', display: 'block', marginTop: '0.25rem' }}>
                       Must be 10 digits
                     </small>
                   )}
                 </div>
                 <div className="form-group">
                   <label>Contact Person</label>
-                  <input 
-                    type="text" 
-                    name="contactPerson" 
-                    value={formData.contactPerson} 
-                    onChange={handleInputChange} 
-                    placeholder="Enter contact person" 
+                  <input
+                    type="text"
+                    name="contactPerson"
+                    value={formData.contactPerson}
+                    onChange={handleInputChange}
+                    placeholder="Enter contact person"
                     disabled={addedCustomer}
                   />
                 </div>
                 <div className="form-group full-width">
                   <label>Address</label>
-                  <textarea 
-                    name="address" 
-                    value={formData.address} 
-                    onChange={handleInputChange} 
-                    rows="3" 
-                    placeholder="Enter customer address" 
+                  <textarea
+                    name="address"
+                    value={formData.address}
+                    onChange={handleInputChange}
+                    rows="3"
+                    placeholder="Enter customer address"
                     disabled={addedCustomer}
                   />
                 </div>
@@ -702,8 +663,8 @@ const AddCustomer = ({ onBack }) => {
               <h3>Product Management</h3>
               <div className="add-product-top-section">
                 {!addedCustomer && (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="btn-add-product-top"
                     onClick={handleShowAddProduct}
                   >
@@ -711,12 +672,12 @@ const AddCustomer = ({ onBack }) => {
                   </button>
                 )}
                 {!addedCustomer && tempProducts.length > 0 && (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     className="btn-clear-products"
                     onClick={handleClearAllProducts}
                   >
-                  
+
                   </button>
                 )}
                 <p className="add-product-hint">
@@ -735,7 +696,7 @@ const AddCustomer = ({ onBack }) => {
               <div className="customer-products-section">
                 <div className="section-header">
                   <h3>
-                    {addedCustomer 
+                    {addedCustomer
                       ? `${addedCustomer.name}'s Products (${tempProducts.length})`
                       : `Products for ${formData.name || 'New Customer'} (${tempProducts.length})`
                     }
@@ -755,7 +716,7 @@ const AddCustomer = ({ onBack }) => {
                     )}
                   </div>
                 </div>
-                
+
                 <div className="products-list">
                   {tempProducts.map(product => (
                     <div key={product.tempId} className="product-card">
@@ -768,17 +729,17 @@ const AddCustomer = ({ onBack }) => {
                         </div>
                         {!addedCustomer && (
                           <div className="product-actions-header">
-                            <button 
-                              type="button" 
-                              className="btn-edit" 
+                            <button
+                              type="button"
+                              className="btn-edit"
                               onClick={() => handleEditProduct(product)}
                               title="Edit product"
                             >
                               ✏️
                             </button>
-                            <button 
-                              type="button" 
-                              className="btn-delete" 
+                            <button
+                              type="button"
+                              className="btn-delete"
                               onClick={() => handleDeleteProduct(product.tempId, product.name, true)}
                               title="Delete product"
                             >
@@ -794,9 +755,9 @@ const AddCustomer = ({ onBack }) => {
                         {product.gst && <p><strong>GST:</strong> {product.gst}%</p>}
                       </div>
                       <div className="product-actions-footer">
-                        <button 
-                          type="button" 
-                          className="btn-ticket" 
+                        <button
+                          type="button"
+                          className="btn-ticket"
                           onClick={() => handleRaiseTicket(product)}
                         >
                           🎫 Raise Ticket
@@ -811,14 +772,14 @@ const AddCustomer = ({ onBack }) => {
             {/* ACTION BUTTONS */}
             <div className="form-actions">
               {!addedCustomer && (
-                <button 
-                  type="submit" 
+                <button
+                  type="submit"
                   className={`btn-primary ${canAddCustomer ? 'btn-purple' : ''}`}
                   disabled={isSubmitting || !canAddCustomer}
                 >
-                  {isSubmitting 
-                    ? 'Adding Customer...' 
-                    : tempProducts.length > 0 
+                  {isSubmitting
+                    ? 'Adding Customer...'
+                    : tempProducts.length > 0
                       ? `Add Customer with ${tempProducts.length} Product(s)`
                       : 'Add Customer'
                   }

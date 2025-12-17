@@ -28,13 +28,13 @@ const AddTicket = ({
       const currentAdmin = localStorage.getItem('currentAdmin');
       const superAdmin = localStorage.getItem('superAdmin');
       let userId = null;
-      
+
       if (currentAdmin) {
         userId = JSON.parse(currentAdmin).uid;
       } else if (superAdmin) {
         userId = JSON.parse(superAdmin).uid;
       }
-      
+
       if (!userId) {
         console.error('No user ID found');
         return "1";
@@ -43,7 +43,7 @@ const AddTicket = ({
       // Query all tickets from the user's collection to find the highest ticket number
       const ticketsRef = collection(db, 'mainData', 'Billuload', 'users', userId, 'tickets');
       const ticketsSnapshot = await getDocs(ticketsRef);
-      
+
       let maxTicketNumber = 0;
       ticketsSnapshot.forEach((doc) => {
         const ticketNum = parseInt(doc.data().ticketNumber);
@@ -51,18 +51,18 @@ const AddTicket = ({
           maxTicketNumber = ticketNum;
         }
       });
-      
+
       // Also check In Stock collection
       const inStockRef = collection(db, 'mainData', 'Billuload', 'inStock');
       const inStockSnapshot = await getDocs(inStockRef);
-      
+
       inStockSnapshot.forEach((doc) => {
         const ticketNum = parseInt(doc.data().ticketNumber);
         if (!isNaN(ticketNum) && ticketNum > maxTicketNumber) {
           maxTicketNumber = ticketNum;
         }
       });
-      
+
       // Return next sequential number
       return (maxTicketNumber + 1).toString();
     } catch (error) {
@@ -218,21 +218,21 @@ const AddTicket = ({
   // Auto-select matching service center when company name matches
   useEffect(() => {
     // Only auto-select if category is Demo or Service and no service center is selected yet
-    if ((formData.category === "Demo" || formData.category === "Service") && 
-        !formData.subOption && 
-        serviceCenters.length > 0) {
-      
+    if ((formData.category === "Demo" || formData.category === "Service") &&
+      !formData.subOption &&
+      serviceCenters.length > 0) {
+
       const productCompany = (formData.companyName || formData.brand || '').toLowerCase().trim();
-      
+
       if (productCompany) {
         // Find exact matching service center
         const matchingCenter = serviceCenters.find(center => {
           const centerCompany = (center.companyName || '').toLowerCase().trim();
-          return centerCompany === productCompany || 
-                 centerCompany.includes(productCompany) || 
-                 productCompany.includes(centerCompany);
+          return centerCompany === productCompany ||
+            centerCompany.includes(productCompany) ||
+            productCompany.includes(centerCompany);
         });
-        
+
         if (matchingCenter) {
           console.log('🎯 Auto-selecting service center:', matchingCenter.serviceCenterName);
           setFormData(prev => ({
@@ -285,7 +285,7 @@ const AddTicket = ({
         adminId = adminInfo.uid || adminInfo.userId || adminInfo.id || null;
         adminName = adminInfo.name || adminInfo.adminName || adminInfo.email?.split('@')[0] || null;
         adminEmail = adminInfo.email || null;
-        
+
         console.log('🆔 AddTicket - Extracted admin ID:', adminId);
         console.log('👤 AddTicket - Extracted admin name:', adminName);
         console.log('📧 AddTicket - Extracted admin email:', adminEmail);
@@ -297,6 +297,7 @@ const AddTicket = ({
 
       const ticketPayload = {
         ...formData,
+        callId: formData.ticketNumber, // Use the main number as callId
         adminId: adminId || formData.adminId || null,
         adminEmail: adminEmail || formData.adminEmail || null,
         createdBy:
@@ -316,7 +317,7 @@ const AddTicket = ({
         const existingService = serviceCenters.find(
           sc => sc.serviceCenterName === formData.subOption || sc.name === formData.subOption
         );
-        
+
         if (!existingService) {
           // Create new service center automatically
           const servicesRef = getCollectionRef('services');
@@ -338,55 +339,55 @@ const AddTicket = ({
       if (ticketData && ticketData.id) {
         // Update existing ticket - only in admin's collection
         console.log('📝 AddTicket - Updating existing ticket:', ticketData.id);
-        
+
         if (adminId) {
           const userTicketRef = doc(db, 'mainData', 'Billuload', 'users', adminId, 'tickets', ticketData.id);
           await setDoc(userTicketRef, ticketPayload, { merge: true });
           console.log('✅ AddTicket - Updated ticket in admin collection');
         }
-        
+
         showNotification("Ticket updated successfully!", "success");
         if (onTicketUpdated) onTicketUpdated();
       } else {
         // Create new ticket - save in admin's collection and main collection
         console.log('🎫 AddTicket - Creating new ticket for admin:', adminId);
         console.log('📦 AddTicket - Ticket payload:', ticketPayload);
-        
+
         if (!adminId) {
           console.error('❌ AddTicket - Cannot create ticket: No admin ID!');
           showNotification("Error: Cannot create ticket. Admin session not found.", "error");
           return;
         }
-        
+
         try {
           // Save to user's tickets collection (matching actual Firebase structure)
           const userTicketsRef = getAdminTicketsCollectionRef(adminId);
           console.log('📂 AddTicket - Saving to user collection: mainData/Billuload/users/' + adminId + '/tickets');
-          
+
           const ticketDocRef = await addDoc(userTicketsRef, {
             ...ticketPayload,
             customerId: prefilledData?.customerId || ticketPayload.customerId || null,
             productId: prefilledData?.productId || ticketPayload.productId || null,
             userId: adminId // Ensure userId is set for filtering
           });
-          
+
           console.log(`✅ AddTicket - Ticket created with ID: ${ticketDocRef.id}`);
           console.log('🎉 AddTicket - Ticket creation complete!');
-          
+
           showNotification("Ticket added successfully!", "success");
         } catch (saveError) {
           console.error('❌ Error saving ticket to Firestore:', saveError);
-          
+
           if (saveError.code === 'permission-denied') {
             showNotification("Permission denied. Please contact administrator to fix Firestore access.", "error");
           } else {
             showNotification("Error saving ticket. Please try again or contact support.", "error");
           }
-          
+
           // Don't navigate away if save failed
           return;
         }
-        
+
         // Navigate back immediately - the notification will show during navigation
         if (onTicketAdded) onTicketAdded();
         if (onBack) onBack();
@@ -407,25 +408,25 @@ const AddTicket = ({
 
   // Smart filtering: Show matching service centers first, then others
   const productCompany = (formData.companyName || formData.brand || '').toLowerCase().trim();
-  
+
   const filteredServiceCenters = serviceCenters.sort((a, b) => {
     const aCompany = (a.companyName || '').toLowerCase().trim();
     const bCompany = (b.companyName || '').toLowerCase().trim();
-    
+
     // Check if company names match the product company
     const aMatches = productCompany && (
-      aCompany.includes(productCompany) || 
+      aCompany.includes(productCompany) ||
       productCompany.includes(aCompany)
     );
     const bMatches = productCompany && (
-      bCompany.includes(productCompany) || 
+      bCompany.includes(productCompany) ||
       productCompany.includes(bCompany)
     );
-    
+
     // Sort matching companies first
     if (aMatches && !bMatches) return -1;
     if (!aMatches && bMatches) return 1;
-    
+
     // Then sort alphabetically
     return (a.companyName || '').localeCompare(b.companyName || '');
   });
@@ -434,7 +435,7 @@ const AddTicket = ({
   const matchingCenters = filteredServiceCenters.filter(center => {
     const centerCompany = (center.companyName || '').toLowerCase().trim();
     return productCompany && (
-      centerCompany.includes(productCompany) || 
+      centerCompany.includes(productCompany) ||
       productCompany.includes(centerCompany)
     );
   });
@@ -459,8 +460,13 @@ const AddTicket = ({
           <form onSubmit={handleSubmit} className="ticket-form">
             <div className="form-grid">
               <div className="form-group">
-                <label>Ticket Number</label>
-                <input type="text" value={formData.ticketNumber} readOnly />
+                <label>Call ID</label>
+                <input
+                  type="text"
+                  name="ticketNumber"
+                  value={formData.ticketNumber}
+                  onChange={handleChange}
+                />
               </div>
 
               <div className="form-group">
@@ -545,22 +551,7 @@ const AddTicket = ({
                 </select>
               </div>
 
-              {/* Call ID - Only for Demo and Service categories */}
-              {showServiceCenters && (
-                <div className="form-group">
-                  <label>Call ID</label>
-                  <input
-                    type="text"
-                    name="callId"
-                    value={formData.callId}
-                    onChange={handleChange}
-                    placeholder="Enter call ID (optional)"
-                  />
-                  <small style={{ color: '#6c757d', fontSize: '0.85rem', marginTop: '0.25rem', display: 'block' }}>
-                    Reference ID for service/demo call
-                  </small>
-                </div>
-              )}
+
 
               {/* Service Center for Demo and Service */}
               {showServiceCenters && (
@@ -588,37 +579,37 @@ const AddTicket = ({
                           {filteredServiceCenters.filter(center => {
                             const centerCompany = (center.companyName || '').toLowerCase().trim();
                             const matches = productCompany && (
-                              centerCompany.includes(productCompany) || 
+                              centerCompany.includes(productCompany) ||
                               productCompany.includes(centerCompany)
                             );
                             return !matches;
                           }).length > 0 && (
-                            <optgroup label="📋 Other Service Centers">
-                              {filteredServiceCenters.filter(center => {
-                                const centerCompany = (center.companyName || '').toLowerCase().trim();
-                                const matches = productCompany && (
-                                  centerCompany.includes(productCompany) || 
-                                  productCompany.includes(centerCompany)
-                                );
-                                return !matches;
-                              }).map((center, idx) => (
-                                <option key={center.id || idx} value={center.serviceCenterName || center.name}>
-                                  {center.companyName ? `${center.companyName} - ${center.serviceCenterName || center.name}` : (center.serviceCenterName || center.name)}
-                                </option>
-                              ))}
-                            </optgroup>
-                          )}
+                              <optgroup label="📋 Other Service Centers">
+                                {filteredServiceCenters.filter(center => {
+                                  const centerCompany = (center.companyName || '').toLowerCase().trim();
+                                  const matches = productCompany && (
+                                    centerCompany.includes(productCompany) ||
+                                    productCompany.includes(centerCompany)
+                                  );
+                                  return !matches;
+                                }).map((center, idx) => (
+                                  <option key={center.id || idx} value={center.serviceCenterName || center.name}>
+                                    {center.companyName ? `${center.companyName} - ${center.serviceCenterName || center.name}` : (center.serviceCenterName || center.name)}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            )}
                         </>
                       ) : (
                         <option disabled>No service centers available. Please add one from Services page.</option>
                       )}
                       <option value="__new__">+ Add New Service Center</option>
                     </select>
-                    <small style={{color: '#6b7280', display: 'block', marginTop: '0.25rem'}}>
-                      {matchingCenters.length > 0 
-                        ? `✨ ${matchingCenters.length} matching service center(s) for ${formData.companyName || formData.brand} | ${filteredServiceCenters.length} total` 
-                        : filteredServiceCenters.length > 0 
-                          ? `📋 ${filteredServiceCenters.length} service center(s) available (no exact match for ${formData.companyName || formData.brand})` 
+                    <small style={{ color: '#6b7280', display: 'block', marginTop: '0.25rem' }}>
+                      {matchingCenters.length > 0
+                        ? `✨ ${matchingCenters.length} matching service center(s) for ${formData.companyName || formData.brand} | ${filteredServiceCenters.length} total`
+                        : filteredServiceCenters.length > 0
+                          ? `📋 ${filteredServiceCenters.length} service center(s) available (no exact match for ${formData.companyName || formData.brand})`
                           : '⚠️ No service centers found. Add them from Services page.'}
                     </small>
                   </div>
@@ -633,7 +624,7 @@ const AddTicket = ({
                         }}
                         required
                       />
-                      <small style={{color: '#6b7280', display: 'block', marginTop: '0.25rem'}}>
+                      <small style={{ color: '#6b7280', display: 'block', marginTop: '0.25rem' }}>
                         ✨ This service center will be automatically added to the Service Center page
                       </small>
                     </div>

@@ -9,6 +9,9 @@ import Loader from './Loader';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import AddCustomer from './AddCustomer';
+
+
 import "./Tickets.css";
 
 // Cache tickets globally to avoid reloading
@@ -16,17 +19,18 @@ let cachedTickets = [];
 let lastLoadTime = 0;
 const CACHE_DURATION = 30000; // 30 seconds
 
-const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = true, showEditableNotes = false, inStockStatusFilter = null, setInStockStatusFilter }) => {
+const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = true, showEditableNotes = false, inStockStatusFilter = null, setInStockStatusFilter, showAddCustomerAction = false }) => {
   const [allTickets, setAllTickets] = useState(cachedTickets); // Start with cached tickets
   const [displayedTickets, setDisplayedTickets] = useState([]); // Only tickets to show (9 at a time)
   const [currentBatch, setCurrentBatch] = useState(0); // Current batch number (0, 1, 2...)
   const [searchTerm, setSearchTerm] = useState("");
   const [allCategories, setAllCategories] = useState([]);
-  const [selectedDate, setSelectedDate] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("active"); // "active", "cancelled", "resolved", "all"
   const [technicians, setTechnicians] = useState([]);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, type: '', ticketId: null });
-  const [viewMode, setViewMode] = useState("grid"); // "grid" or "table"
+
   const [isLoading, setIsLoading] = useState(cachedTickets.length === 0); // Only show loading if no cache
   const [loadingMore, setLoadingMore] = useState(false); // Loading next batch
   const BATCH_SIZE = 9; // Show 9 tickets per batch
@@ -36,41 +40,43 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
   const [editingTicket, setEditingTicket] = useState({}); // Track which ticket is in full edit mode
   const [ticketEditValues, setTicketEditValues] = useState({}); // Store ticket field values being edited
   const [showExportMenu, setShowExportMenu] = useState(false); // Track export menu visibility
+  const [showAddCustomerModal, setShowAddCustomerModal] = useState(false); // Track Add Customer modal visibility
+
 
 
   // Get current user ID for user-specific tickets
- const getCurrentUserId = () => {
-  try {
-    const currentAdmin = localStorage.getItem('currentAdmin');
-    const superAdmin = localStorage.getItem('superAdmin');
+  const getCurrentUserId = () => {
+    try {
+      const currentAdmin = localStorage.getItem('currentAdmin');
+      const superAdmin = localStorage.getItem('superAdmin');
 
-    console.log('🔍 Tickets.js - Getting user ID');
-    console.log('currentAdmin raw:', currentAdmin);
-    console.log('superAdmin raw:', superAdmin);
+      console.log('🔍 Tickets.js - Getting user ID');
+      console.log('currentAdmin raw:', currentAdmin);
+      console.log('superAdmin raw:', superAdmin);
 
-    if (currentAdmin) {
-      const adminData = JSON.parse(currentAdmin);
-      const userId = adminData?.uid;  // ✅ FIXED
-      console.log('🆔 Tickets.js - Extracted user ID from currentAdmin:', userId);
-      console.log('🆔 Type:', typeof userId);
-      return userId;
+      if (currentAdmin) {
+        const adminData = JSON.parse(currentAdmin);
+        const userId = adminData?.uid;  // ✅ FIXED
+        console.log('🆔 Tickets.js - Extracted user ID from currentAdmin:', userId);
+        console.log('🆔 Type:', typeof userId);
+        return userId;
+      }
+
+      if (superAdmin) {
+        const adminData = JSON.parse(superAdmin);
+        const userId = adminData?.uid;  // ✅ FIXED
+        console.log('🆔 Tickets.js - Extracted user ID from superAdmin:', userId);
+        console.log('🆔 Type:', typeof userId);
+        return userId;
+      }
+
+      console.log('❌ Tickets.js - No admin data found');
+      return null;
+    } catch (error) {
+      console.error('❌ Tickets.js - Error getting user ID:', error);
+      return null;
     }
-
-    if (superAdmin) {
-      const adminData = JSON.parse(superAdmin);
-      const userId = adminData?.uid;  // ✅ FIXED
-      console.log('🆔 Tickets.js - Extracted user ID from superAdmin:', userId);
-      console.log('🆔 Type:', typeof userId);
-      return userId;
-    }
-
-    console.log('❌ Tickets.js - No admin data found');
-    return null;
-  } catch (error) {
-    console.error('❌ Tickets.js - Error getting user ID:', error);
-    return null;
-  }
-};
+  };
 
   const getCurrentUserName = () => {
     try {
@@ -113,24 +119,24 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
 
       console.log('📥 Loading fresh tickets...');
       setIsLoading(true);
-      
+
       const allTickets = [];
       const seenTicketIds = new Set();
-      
+
       // Load only current user's tickets to prevent Firestore internal errors
       const currentUserId = getCurrentUserId();
       const currentUserName = getCurrentUserName();
-      
+
       if (currentUserId) {
         try {
           console.log('📥 Loading current user tickets...');
           const userTicketsRef = getAdminTicketsCollectionRef(currentUserId);
           const userTicketsSnapshot = await getDocs(userTicketsRef);
-          
+
           userTicketsSnapshot.docs.forEach(ticketDoc => {
             const ticketData = ticketDoc.data();
             const ticketIdentifier = ticketData.ticketNumber || ticketDoc.id;
-            
+
             if (!seenTicketIds.has(ticketIdentifier)) {
               seenTicketIds.add(ticketIdentifier);
               allTickets.push({
@@ -140,18 +146,18 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
               });
             }
           });
-          
+
           console.log(`✅ Loaded ${allTickets.length} regular tickets for current user`);
-          
+
           // Also load In Stock tickets
           console.log('📥 Loading In Stock tickets...');
           const inStockRef = collection(db, 'mainData', 'Billuload', 'inStock');
           const inStockSnapshot = await getDocs(inStockRef);
-          
+
           inStockSnapshot.docs.forEach(ticketDoc => {
             const ticketData = ticketDoc.data();
             const ticketIdentifier = ticketData.ticketNumber || ticketDoc.id;
-            
+
             // Only add In Stock tickets created by current user
             if (!seenTicketIds.has(ticketIdentifier) && ticketData.userId === currentUserId) {
               seenTicketIds.add(ticketIdentifier);
@@ -162,11 +168,11 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
               });
             }
           });
-          
+
           console.log(`✅ Total loaded: ${allTickets.length} tickets (including In Stock)`);
         } catch (currentUserError) {
           console.error('❌ Error loading current user tickets:', currentUserError);
-          
+
           // Show user-friendly error message
           showNotification('Unable to load tickets. Please check your connection and try again.', 'error');
         }
@@ -174,35 +180,35 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         console.error('❌ No current user ID found');
         showNotification('Please log in again to view tickets.', 'error');
       }
-      
+
       // Sort tickets by creation date (oldest first)
       allTickets.sort((a, b) => {
         const dateA = new Date(a.createdAt || 0);
         const dateB = new Date(b.createdAt || 0);
         return dateA - dateB;
       });
-      
+
       console.log(`✅ Loaded ${allTickets.length} tickets`);
-      
+
       // Update cache
       cachedTickets = allTickets;
       lastLoadTime = Date.now();
-      
+
       setAllTickets(allTickets);
       setDisplayedTickets(allTickets.slice(0, BATCH_SIZE));
       setCurrentBatch(0);
-      
+
       const categories = [...new Set(allTickets.map(t => t.category).filter(Boolean))];
       setAllCategories(categories);
-      
+
       setIsLoading(false);
-      
+
     } catch (error) {
       console.error("❌ Error loading tickets:", error);
       setIsLoading(false);
       setAllTickets([]);
       setDisplayedTickets([]);
-      
+
       if (error.code === 'permission-denied') {
         showNotification('Permission denied. Please check your access rights or contact an administrator.', 'error');
       } else {
@@ -225,7 +231,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       console.log('🚀 Loading tickets for first time...');
       loadAllTickets();
     }
-    
+
     return () => {
       console.log('🔌 Tickets component unmounting...');
     };
@@ -235,17 +241,17 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
   // Load next batch of 9 tickets
   const loadNextBatch = () => {
     setLoadingMore(true);
-    
+
     setTimeout(() => {
       const nextBatch = currentBatch + 1;
       const startIndex = 0;
       const endIndex = (nextBatch + 1) * BATCH_SIZE;
-      
+
       // Show tickets from start to end of next batch
       setDisplayedTickets(allTickets.slice(startIndex, endIndex));
       setCurrentBatch(nextBatch);
       setLoadingMore(false);
-      
+
       console.log(`📦 Loaded batch ${nextBatch + 1}, showing ${endIndex} tickets`);
     }, 500); // Small delay for smooth UX
   };
@@ -262,13 +268,13 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       if (!hasMoreBatches() || loadingMore) {
         return;
       }
-      
+
       // Check if user scrolled near bottom (300px from bottom)
       if (window.innerHeight + window.scrollY >= document.body.offsetHeight - 300) {
         loadNextBatch();
       }
     };
-    
+
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -292,7 +298,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         setTechnicians([]);
       }
     };
-    
+
     loadTechnicians();
   }, []);
 
@@ -307,7 +313,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       strictMatch: currentUserId === userId,
       looseMatch: currentUserId == userId
     });
-    
+
     // Only block if both IDs exist and don't match (using loose equality to handle string/number differences)
     if (currentUserId && userId && currentUserId != userId) {
       showNotification('You are not authorized to cancel this ticket. Only the admin who created it can make changes.', 'warning');
@@ -320,7 +326,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
     try {
       // Find the ticket to check if it's an In Stock ticket
       const ticket = allTickets.find(t => t.id === confirmDialog.ticketId);
-      
+
       let ticketRef;
       if (ticket && ticket.category === 'In Stock') {
         // For In Stock tickets, use the dedicated inStock collection
@@ -339,25 +345,25 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         status: 'Cancelled',
         cancelledAt: new Date().toISOString()
       });
-      
+
       // Update the ticket in local state
-      setAllTickets(prevTickets => 
-        prevTickets.map(ticket => 
-          ticket.id === confirmDialog.ticketId 
+      setAllTickets(prevTickets =>
+        prevTickets.map(ticket =>
+          ticket.id === confirmDialog.ticketId
             ? { ...ticket, status: 'Cancelled', cancelledAt: new Date().toISOString() }
             : ticket
         )
       );
-      
+
       // Also update displayed tickets
-      setDisplayedTickets(prevTickets => 
-        prevTickets.map(ticket => 
-          ticket.id === confirmDialog.ticketId 
+      setDisplayedTickets(prevTickets =>
+        prevTickets.map(ticket =>
+          ticket.id === confirmDialog.ticketId
             ? { ...ticket, status: 'Cancelled', cancelledAt: new Date().toISOString() }
             : ticket
         )
       );
-      
+
       showNotification('Ticket cancelled successfully!', 'success');
     } catch (error) {
       console.error('Error cancelling ticket:', error);
@@ -377,7 +383,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       strictMatch: currentUserId === userId,
       looseMatch: currentUserId == userId
     });
-    
+
     // Only block if both IDs exist and don't match (using loose equality to handle string/number differences)
     if (currentUserId && userId && currentUserId != userId) {
       showNotification('You are not authorized to modify this ticket. Only the admin who created it can make changes.', 'warning');
@@ -394,7 +400,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
     try {
       // Find the ticket to check if it's an In Stock ticket
       const ticket = allTickets.find(t => t.id === id);
-      
+
       let ticketRef;
       if (ticket && ticket.category === 'In Stock') {
         // For In Stock tickets, use the dedicated inStock collection
@@ -407,27 +413,27 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         }
         ticketRef = getAdminTicketDocRef(ticketUserId, id);
       }
-      
+
       await updateDoc(ticketRef, { status: newStatus });
-      
+
       // Update the ticket in local state immediately (no reload needed)
-      setAllTickets(prevTickets => 
-        prevTickets.map(ticket => 
-          ticket.id === id 
+      setAllTickets(prevTickets =>
+        prevTickets.map(ticket =>
+          ticket.id === id
             ? { ...ticket, status: newStatus }
             : ticket
         )
       );
-      
+
       // Also update displayed tickets
-      setDisplayedTickets(prevTickets => 
-        prevTickets.map(ticket => 
-          ticket.id === id 
+      setDisplayedTickets(prevTickets =>
+        prevTickets.map(ticket =>
+          ticket.id === id
             ? { ...ticket, status: newStatus }
             : ticket
         )
       );
-      
+
       showNotification('Ticket status updated!', 'success');
     } catch (error) {
       console.error('Error updating ticket:', error);
@@ -439,9 +445,9 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
     try {
       // Find the ticket to check if it's an In Stock ticket
       const ticket = allTickets.find(t => t.id === confirmDialog.ticketId);
-      
+
       const resolvedAt = new Date().toISOString();
-      
+
       let ticketRef;
       if (ticket && ticket.category === 'In Stock') {
         // For In Stock tickets, use the dedicated inStock collection
@@ -454,31 +460,31 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         }
         ticketRef = getAdminTicketDocRef(ticketUserId, confirmDialog.ticketId);
       }
-      
-      await updateDoc(ticketRef, { 
+
+      await updateDoc(ticketRef, {
         status: 'Resolved',
         resolvedAt: resolvedAt,
         resolvedDate: resolvedAt // Fallback for old field name
       });
-      
+
       // Update the ticket in local state immediately (no reload needed)
-      setAllTickets(prevTickets => 
-        prevTickets.map(ticket => 
-          ticket.id === confirmDialog.ticketId 
+      setAllTickets(prevTickets =>
+        prevTickets.map(ticket =>
+          ticket.id === confirmDialog.ticketId
             ? { ...ticket, status: 'Resolved', resolvedAt: resolvedAt, resolvedDate: resolvedAt }
             : ticket
         )
       );
-      
+
       // Also update displayed tickets
-      setDisplayedTickets(prevTickets => 
-        prevTickets.map(ticket => 
-          ticket.id === confirmDialog.ticketId 
+      setDisplayedTickets(prevTickets =>
+        prevTickets.map(ticket =>
+          ticket.id === confirmDialog.ticketId
             ? { ...ticket, status: 'Resolved', resolvedAt: resolvedAt, resolvedDate: resolvedAt }
             : ticket
         )
       );
-      
+
       showNotification('Ticket resolved successfully!', 'success');
     } catch (error) {
       console.error('Error resolving ticket:', error);
@@ -506,20 +512,20 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         showNotification('Please login to make changes.', 'error');
         return;
       }
-      
+
       // Only allow the creator to edit the ticket
       if (ticket.userId && ticket.userId !== currentUserId) {
         showNotification('You are not authorized to modify this ticket. Only the admin who created it can make changes.', 'error');
         setEditingNote(prev => ({ ...prev, [ticketId]: false }));
         return;
       }
-      
+
       const newNote = noteValues[ticketId];
-      
+
       // Determine if it's an In Stock ticket or regular ticket
       let ticketRef;
       const fieldName = ticket.category === 'In Stock' ? 'description' : 'note';
-      
+
       if (ticket.category === 'In Stock') {
         ticketRef = doc(db, 'mainData', 'Billuload', 'inStock', ticketId);
       } else {
@@ -530,26 +536,26 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         }
         ticketRef = getAdminTicketDocRef(ticketUserId, ticketId);
       }
-      
+
       await updateDoc(ticketRef, { [fieldName]: newNote });
-      
+
       // Update local state
-      setAllTickets(prevTickets => 
-        prevTickets.map(t => 
-          t.id === ticketId 
+      setAllTickets(prevTickets =>
+        prevTickets.map(t =>
+          t.id === ticketId
             ? { ...t, [fieldName]: newNote }
             : t
         )
       );
-      
-      setDisplayedTickets(prevTickets => 
-        prevTickets.map(t => 
-          t.id === ticketId 
+
+      setDisplayedTickets(prevTickets =>
+        prevTickets.map(t =>
+          t.id === ticketId
             ? { ...t, [fieldName]: newNote }
             : t
         )
       );
-      
+
       setEditingNote(prev => ({ ...prev, [ticketId]: false }));
       showNotification('Note updated successfully!', 'success');
     } catch (error) {
@@ -565,8 +571,8 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
   // Handle full ticket editing
   const handleEditTicket = (ticket) => {
     setEditingTicket(prev => ({ ...prev, [ticket.id]: true }));
-    setTicketEditValues(prev => ({ 
-      ...prev, 
+    setTicketEditValues(prev => ({
+      ...prev,
       [ticket.id]: {
         customerName: ticket.customerName || '',
         productName: ticket.productName || '',
@@ -594,16 +600,16 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         showNotification('Please login to make changes.', 'error');
         return;
       }
-      
+
       // Only allow the creator to edit the ticket
       if (ticket.userId && ticket.userId !== currentUserId) {
         showNotification('You are not authorized to modify this ticket. Only the admin who created it can make changes.', 'error');
         setEditingTicket(prev => ({ ...prev, [ticketId]: false }));
         return;
       }
-      
+
       const updatedFields = ticketEditValues[ticketId];
-      
+
       let ticketRef;
       if (ticket.category === 'In Stock') {
         ticketRef = doc(db, 'mainData', 'Billuload', 'inStock', ticketId);
@@ -615,26 +621,26 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         }
         ticketRef = getAdminTicketDocRef(ticketUserId, ticketId);
       }
-      
+
       await updateDoc(ticketRef, updatedFields);
-      
+
       // Update local state
-      setAllTickets(prevTickets => 
-        prevTickets.map(t => 
-          t.id === ticketId 
+      setAllTickets(prevTickets =>
+        prevTickets.map(t =>
+          t.id === ticketId
             ? { ...t, ...updatedFields }
             : t
         )
       );
-      
-      setDisplayedTickets(prevTickets => 
-        prevTickets.map(t => 
-          t.id === ticketId 
+
+      setDisplayedTickets(prevTickets =>
+        prevTickets.map(t =>
+          t.id === ticketId
             ? { ...t, ...updatedFields }
             : t
         )
       );
-      
+
       setEditingTicket(prev => ({ ...prev, [ticketId]: false }));
       showNotification('Ticket updated successfully!', 'success');
     } catch (error) {
@@ -680,7 +686,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
   // Export all pending tickets to PDF
   const exportAllPendingToPDF = () => {
     const pendingTickets = allTickets.filter(ticket => ticket.status === 'Pending');
-    
+
     if (pendingTickets.length === 0) {
       showNotification('No pending tickets to export', 'error');
       setShowExportMenu(false);
@@ -688,17 +694,17 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
     }
 
     const doc = new jsPDF();
-    
+
     // Add title
     doc.setFontSize(18);
     doc.setTextColor(59, 130, 246);
     doc.text('Pending Tickets Report', 14, 22);
-    
+
     // Add generation date
     doc.setFontSize(11);
     doc.setTextColor(0, 0, 0);
     doc.text(`Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 14, 32);
-    
+
     // Prepare table data
     const tableData = pendingTickets.map(ticket => [
       ticket.callNo || ticket.callId || ticket.ticketNumber || 'N/A',
@@ -708,7 +714,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       ticket.status || 'N/A',
       ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'N/A'
     ]);
-    
+
     // Add table
     autoTable(doc, {
       startY: 40,
@@ -726,7 +732,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         5: { cellWidth: 30 }
       }
     });
-    
+
     // Save PDF
     doc.save(`pending-tickets-${new Date().toISOString().split('T')[0]}.pdf`);
     showNotification(`${pendingTickets.length} pending tickets exported to PDF!`, 'success');
@@ -736,7 +742,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
   // Export all pending tickets to Excel
   const exportAllPendingToExcel = () => {
     const pendingTickets = allTickets.filter(ticket => ticket.status === 'Pending');
-    
+
     if (pendingTickets.length === 0) {
       showNotification('No pending tickets to export', 'error');
       setShowExportMenu(false);
@@ -756,10 +762,10 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       'Created Date': ticket.createdAt ? new Date(ticket.createdAt).toLocaleDateString() : 'N/A',
       'Description': ticket.description || ticket.note || 'N/A'
     }));
-    
+
     // Create worksheet
     const ws = XLSX.utils.json_to_sheet(excelData);
-    
+
     // Set column widths
     ws['!cols'] = [
       { wch: 12 }, // Ticket #
@@ -773,11 +779,11 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       { wch: 15 }, // Created Date
       { wch: 40 }  // Description
     ];
-    
+
     // Create workbook
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Pending Tickets');
-    
+
     // Save Excel file
     XLSX.writeFile(wb, `pending-tickets-${new Date().toISOString().split('T')[0]}.xlsx`);
     showNotification(`${pendingTickets.length} pending tickets exported to Excel!`, 'success');
@@ -790,12 +796,27 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
   };
 
   const filterTicketsByDate = (ticket) => {
-    if (!selectedDate) return true;
+    if (!startDate && !endDate) return true;
+
     const ticketDate = new Date(ticket.createdAt);
-    const filterDate = new Date(selectedDate);
-    return ticketDate.getFullYear() === filterDate.getFullYear() &&
-           ticketDate.getMonth() === filterDate.getMonth() &&
-           ticketDate.getDate() === filterDate.getDate();
+    ticketDate.setHours(0, 0, 0, 0); // Reset time to start of day for accurate comparison
+
+    let matchesStart = true;
+    let matchesEnd = true;
+
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      matchesStart = ticketDate >= start;
+    }
+
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999); // Set to end of day
+      matchesEnd = ticketDate <= end;
+    }
+
+    return matchesStart && matchesEnd;
   };
 
   // Apply filters to displayed tickets (current batch)
@@ -804,20 +825,20 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       // Search filter
       const searchMatch = searchTerm
         ? (
-            normalizeString(ticket.customerName || '').includes(normalizeString(searchTerm)) ||
-            normalizeString(ticket.ticketNumber?.toString() || '').includes(normalizeString(searchTerm)) ||
-            normalizeString(ticket.companyName || '').includes(normalizeString(searchTerm)) ||
-            normalizeString(ticket.productName || '').includes(normalizeString(searchTerm)) ||
-            normalizeString(ticket.callId?.toString() || '').includes(normalizeString(searchTerm)) ||
-            normalizeString(ticket.callNo?.toString() || '').includes(normalizeString(searchTerm))
-          )
+          normalizeString(ticket.customerName || '').includes(normalizeString(searchTerm)) ||
+          normalizeString(ticket.ticketNumber?.toString() || '').includes(normalizeString(searchTerm)) ||
+          normalizeString(ticket.companyName || '').includes(normalizeString(searchTerm)) ||
+          normalizeString(ticket.productName || '').includes(normalizeString(searchTerm)) ||
+          normalizeString(ticket.callId?.toString() || '').includes(normalizeString(searchTerm)) ||
+          normalizeString(ticket.callNo?.toString() || '').includes(normalizeString(searchTerm))
+        )
         : true;
-      
-      const categoryMatch = filterCategory 
+
+      const categoryMatch = filterCategory
         ? normalizeString(ticket.category) === normalizeString(filterCategory)
         : true;
       const dateMatch = filterTicketsByDate(ticket);
-      
+
       // Status filter logic (only when showStatusFilter is true)
       let statusMatch = true;
       if (showStatusFilter) {
@@ -829,7 +850,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
           statusMatch = ticket.status === 'Resolved';
         }
       }
-      
+
       // In Stock status filter (when viewing In Stock category)
       let inStockMatch = true;
       if (inStockStatusFilter && normalizeString(ticket.category) === 'in stock') {
@@ -844,7 +865,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         }
         // 'all' shows everything, no filter needed
       }
-      
+
       const resolvedMatch = excludeResolved ? ticket.status !== 'Resolved' && ticket.status !== 'Cancelled' : true;
       return searchMatch && categoryMatch && dateMatch && statusMatch && resolvedMatch && inStockMatch;
     })
@@ -861,20 +882,20 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       // Search filter
       const searchMatch = searchTerm
         ? (
-            normalizeString(ticket.customerName || '').includes(normalizeString(searchTerm)) ||
-            normalizeString(ticket.ticketNumber?.toString() || '').includes(normalizeString(searchTerm)) ||
-            normalizeString(ticket.companyName || '').includes(normalizeString(searchTerm)) ||
-            normalizeString(ticket.productName || '').includes(normalizeString(searchTerm)) ||
-            normalizeString(ticket.callId?.toString() || '').includes(normalizeString(searchTerm)) ||
-            normalizeString(ticket.callNo?.toString() || '').includes(normalizeString(searchTerm))
-          )
+          normalizeString(ticket.customerName || '').includes(normalizeString(searchTerm)) ||
+          normalizeString(ticket.ticketNumber?.toString() || '').includes(normalizeString(searchTerm)) ||
+          normalizeString(ticket.companyName || '').includes(normalizeString(searchTerm)) ||
+          normalizeString(ticket.productName || '').includes(normalizeString(searchTerm)) ||
+          normalizeString(ticket.callId?.toString() || '').includes(normalizeString(searchTerm)) ||
+          normalizeString(ticket.callNo?.toString() || '').includes(normalizeString(searchTerm))
+        )
         : true;
-      
-      const categoryMatch = filterCategory 
+
+      const categoryMatch = filterCategory
         ? normalizeString(ticket.category) === normalizeString(filterCategory)
         : true;
       const dateMatch = filterTicketsByDate(ticket);
-      
+
       // Status filter logic (only when showStatusFilter is true)
       let statusMatch = true;
       if (showStatusFilter) {
@@ -886,7 +907,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
           statusMatch = ticket.status === 'Resolved';
         }
       }
-      
+
       // In Stock status filter (when viewing In Stock category)
       let inStockMatch = true;
       if (inStockStatusFilter && normalizeString(ticket.category) === 'in stock') {
@@ -901,7 +922,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         }
         // 'all' shows everything, no filter needed
       }
-      
+
       const resolvedMatch = excludeResolved ? ticket.status !== 'Resolved' && ticket.status !== 'Cancelled' : true;
       return searchMatch && categoryMatch && dateMatch && statusMatch && resolvedMatch && inStockMatch;
     }).length;
@@ -909,7 +930,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
   const getCategoryDisplayName = (category) => {
     const categoryMap = {
       "demo": "Demo",
-      "service": "Service", 
+      "service": "Service",
       "third party": "Third Party",
       "in store": "In Store"
     };
@@ -931,29 +952,16 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
             <div className="tickets-count">
               Showing {filteredTickets.length} of {totalFilteredCount} {totalFilteredCount === 1 ? 'ticket' : 'tickets'}
               {filterCategory && ` in "${getCategoryDisplayName(filterCategory)}"`}
-              {selectedDate && ` on ${new Date(selectedDate).toLocaleDateString()}`}
+              {(startDate || endDate) && (
+                <span>
+                  {startDate && endDate ? ` from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}` :
+                    startDate ? ` from ${new Date(startDate).toLocaleDateString()}` :
+                      ` until ${new Date(endDate).toLocaleDateString()}`}
+                </span>
+              )}
             </div>
 
             <div className="filter-section">
-              <div className="view-toggle-section">
-                <label className="filter-label">View:</label>
-                <div className="view-toggle-buttons">
-                  <button
-                    className={`view-toggle-btn ${viewMode === "grid" ? "active" : ""}`}
-                    onClick={() => setViewMode("grid")}
-                  >
-                    <span className="view-icon">⊞</span>
-                    Grid
-                  </button>
-                  <button
-                    className={`view-toggle-btn ${viewMode === "table" ? "active" : ""}`}
-                    onClick={() => setViewMode("table")}
-                  >
-                    <span className="view-icon">☰</span>
-                    Table
-                  </button>
-                </div>
-              </div>
 
               {inStockStatusFilter !== null && setInStockStatusFilter && (
                 <div className="status-filter">
@@ -971,6 +979,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                 </div>
               )}
 
+              {/* Status Filter for Tickets Section */}
               {showStatusFilter && (
                 <div className="status-filter">
                   <label htmlFor="statusFilter" className="filter-label">
@@ -983,28 +992,43 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                     className="filter-select"
                   >
                     <option value="active">Active Tickets</option>
-                    <option value="cancelled">Cancelled</option>
                     <option value="resolved">Resolved</option>
-                    <option value="all">All Tickets</option>
+                    <option value="cancelled">Cancelled</option>
                   </select>
                 </div>
               )}
 
+
               <div className="date-filter-section">
-                <label htmlFor="dateFilter" className="date-filter-label">
-                  Date:
+                <label htmlFor="startDateFilter" className="date-filter-label">
+                  Start Date:
                 </label>
                 <input
                   type="date"
-                  id="dateFilter"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
+                  id="startDateFilter"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
                   className="date-filter-input"
+                  max={endDate || undefined}
                 />
-                {selectedDate && (
-                  <button 
+                <label htmlFor="endDateFilter" className="date-filter-label" style={{ marginLeft: '10px' }}>
+                  End Date:
+                </label>
+                <input
+                  type="date"
+                  id="endDateFilter"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="date-filter-input"
+                  min={startDate || undefined}
+                />
+                {(startDate || endDate) && (
+                  <button
                     className="clear-date-filter"
-                    onClick={() => setSelectedDate("")}
+                    onClick={() => {
+                      setStartDate("");
+                      setEndDate("");
+                    }}
                   >
                     Clear
                   </button>
@@ -1036,10 +1060,10 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                   <span style={{ fontSize: '1.1rem' }}>📥</span>
                   Export
                 </button>
-                
+
                 {showExportMenu && (
                   <>
-                    <div 
+                    <div
                       style={{
                         position: 'fixed',
                         top: 0,
@@ -1114,6 +1138,37 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                   </>
                 )}
               </div>
+
+              {/* Add Customer Button (Conditional for Dashboard) */}
+              {showAddCustomerAction && (
+                <div style={{ position: 'relative', marginLeft: '10px' }}>
+                  <button
+                    onClick={() => setShowAddCustomerModal(true)}
+                    style={{
+                      padding: '8px 16px',
+                      fontSize: '0.9rem',
+                      borderRadius: '6px',
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                      color: 'white',
+                      cursor: 'pointer',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      boxShadow: '0 2px 4px rgba(59, 130, 246, 0.3)',
+                      transition: 'all 0.3s ease'
+                    }}
+                    title="Add New Customer"
+                    onMouseEnter={(e) => e.target.style.transform = 'translateY(-2px)'}
+                    onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+                  >
+                    <span style={{ fontSize: '1.2rem' }}>+</span>
+                    Add Customer
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1131,7 +1186,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
           />
         </div>
         {searchTerm && (
-          <button 
+          <button
             className="clear-search-btn"
             onClick={() => setSearchTerm('')}
             title="Clear search"
@@ -1141,419 +1196,381 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         )}
       </div>
 
-      {viewMode === "grid" ? (
-        <>
-        <div className="tickets-grid">
-          {filteredTickets.length > 0 ? (
-            filteredTickets.map(ticket => (
-              <div
-                key={ticket.id}
-                className="ticket-card"
-              >
-                <div className="ticket-header">
-                  <div className="header-top">
-                    <h3 className="ticket-number">#{ticket.callNo || ticket.callId || ticket.ticketNumber}</h3>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <div 
-                        className="status-badge" 
-                        style={{ backgroundColor: getStatusColor(ticket.status) }}
-                      >
-                        <span className="status-icon">{getStatusIcon(ticket.status)}</span>
-                        {ticket.status}
-                      </div>
-                      {/* Edit button for Pending and In Progress tickets in Dashboard */}
-                      {showEditableNotes && (ticket.status === 'Pending' || ticket.status === 'In Progress') && !editingTicket[ticket.id] && (
-                        <button
-                          className="btn-add-note-quick"
-                          onClick={() => handleEditTicket(ticket)}
-                          title="Edit ticket details"
-                        >
-                          +
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
 
-                <div className="ticket-body">
-                  {editingTicket[ticket.id] ? (
-                    /* Edit Mode - All fields editable */
-                    <div className="ticket-edit-mode">
-                      <div className="edit-section">
-                        <div className="edit-row">
-                          <span className="edit-label">Customer</span>
-                          <input
-                            type="text"
-                            className="edit-input"
-                            value={ticketEditValues[ticket.id]?.customerName || ''}
-                            onChange={(e) => setTicketEditValues(prev => ({
-                              ...prev,
-                              [ticket.id]: { ...prev[ticket.id], customerName: e.target.value }
-                            }))}
-                            placeholder="Customer name"
-                          />
-                        </div>
-                        <div className="edit-row">
-                          <span className="edit-label">Product</span>
-                          <input
-                            type="text"
-                            className="edit-input"
-                            value={ticketEditValues[ticket.id]?.productName || ''}
-                            onChange={(e) => setTicketEditValues(prev => ({
-                              ...prev,
-                              [ticket.id]: { ...prev[ticket.id], productName: e.target.value }
-                            }))}
-                            placeholder="Product name"
-                          />
-                        </div>
-                        <div className="edit-row">
-                          <span className="edit-label">Company</span>
-                          <input
-                            type="text"
-                            className="edit-input"
-                            value={ticketEditValues[ticket.id]?.companyName || ''}
-                            onChange={(e) => setTicketEditValues(prev => ({
-                              ...prev,
-                              [ticket.id]: { ...prev[ticket.id], companyName: e.target.value }
-                            }))}
-                            placeholder="Company name"
-                          />
-                        </div>
-                        <div className="edit-row">
-                          <span className="edit-label">Serial Number</span>
-                          <input
-                            type="text"
-                            className="edit-input"
-                            value={ticketEditValues[ticket.id]?.serialNumber || ''}
-                            onChange={(e) => setTicketEditValues(prev => ({
-                              ...prev,
-                              [ticket.id]: { ...prev[ticket.id], serialNumber: e.target.value }
-                            }))}
-                            placeholder="Serial number"
-                          />
-                        </div>
-                        {(ticket.category === 'Demo' || ticket.category === 'Service') && (
-                          <div className="edit-row">
-                            <span className="edit-label">Call ID</span>
-                            <input
-                              type="text"
-                              className="edit-input"
-                              value={ticketEditValues[ticket.id]?.callId || ''}
-                              onChange={(e) => setTicketEditValues(prev => ({
-                                ...prev,
-                                [ticket.id]: { ...prev[ticket.id], callId: e.target.value }
-                              }))}
-                              placeholder="Call ID"
-                            />
+      <div className="tickets-table-container">
+        {filteredTickets.length > 0 ? (
+          <>
+            {/* Desktop Table View */}
+            <div className="table-responsive">
+              <table className="tickets-table">
+                <thead>
+                  <tr>
+                    <th>Call No</th>
+                    <th>Customer/Product</th>
+                    <th>Phone No</th>
+                    <th>Product/Details</th>
+                    <th>Assigned To</th>
+                    <th>Category</th>
+                    <th>Created Date</th>
+                    <th>Note</th>
+                    <th>Actions</th>
+                    <th>Created By</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredTickets.map(ticket => (
+                    <React.Fragment key={ticket.id}>
+                      <tr className="table-row">
+                        <td className="ticket-number-cell">
+                          {ticket.category === 'Service' ? (ticket.callId ? `#${ticket.callId}` : '-') : `#${ticket.callNo || ticket.callId || ticket.ticketNumber}`}
+                        </td>
+                        <td className="customer-cell">
+                          {ticket.category === 'In Stock' ? ticket.productName : ticket.customerName}
+                        </td>
+                        <td className="phone-cell">
+                          {ticket.phoneNumber || ticket.phone || ticket.contactNumber || '-'}
+                        </td>
+                        <td className="product-cell">
+                          {ticket.category === 'In Stock' ? (
+                            <div style={{ fontSize: '0.85rem' }}>
+                              {ticket.brand && <div><strong>Brand:</strong> {ticket.brand}</div>}
+                              {ticket.model && <div><strong>Model:</strong> {ticket.model}</div>}
+                              {ticket.defectType && <div><strong>Defect:</strong> {ticket.defectType}</div>}
+                              {ticket.quantity && <div><strong>Qty:</strong> {ticket.quantity}</div>}
+                            </div>
+                          ) : (
+                            ticket.productName
+                          )}
+                        </td>
+                        <td className="assigned-cell">{ticket.subOption || "Unassigned"}</td>
+                        <td className="category-cell">{ticket.category}</td>
+
+                        <td className="date-cell">
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div>
+                              <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>Start: </small>
+                              {new Date(ticket.createdAt).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric'
+                              })}
+                            </div>
+                            {ticket.status === 'Resolved' && (ticket.resolvedAt || ticket.resolvedDate) && (
+                              <div style={{ color: '#10b981', fontWeight: '600' }}>
+                                <small style={{ color: '#059669', fontSize: '0.75rem' }}>Resolved: </small>
+                                {new Date(ticket.resolvedAt || ticket.resolvedDate).toLocaleDateString('en-GB', {
+                                  day: '2-digit',
+                                  month: '2-digit',
+                                  year: 'numeric'
+                                })}
+                              </div>
+                            )}
                           </div>
-                        )}
-                        {ticket.category === 'In Stock' && (
-                          <div className="edit-row">
-                            <span className="edit-label">Call No</span>
-                            <input
-                              type="text"
-                              className="edit-input"
-                              value={ticketEditValues[ticket.id]?.callNo || ''}
-                              onChange={(e) => setTicketEditValues(prev => ({
-                                ...prev,
-                                [ticket.id]: { ...prev[ticket.id], callNo: e.target.value }
-                              }))}
-                              placeholder="Call number"
-                            />
+                        </td>
+                        <td className="note-cell" style={{ textAlign: 'left' }}>
+                          {(ticket.category === 'In Stock' ? ticket.description : ticket.note) ? (
+                            <div
+                              onClick={() => handleEditNote(ticket.id, ticket.category === 'In Stock' ? ticket.description : ticket.note)}
+                              title="Click to edit note"
+                              style={{
+                                cursor: 'pointer',
+                                whiteSpace: 'pre-wrap',
+                                fontSize: '0.8rem',
+                                color: '#374151',
+                                textAlign: 'left',
+                                minWidth: '200px',
+                                lineHeight: '1.4'
+                              }}
+                            >
+                              {ticket.category === 'In Stock' ? ticket.description : ticket.note}
+                            </div>
+                          ) : (
+                            <button
+                              className="btn-edit-note"
+                              onClick={() => handleEditNote(ticket.id, ticket.category === 'In Stock' ? ticket.description : ticket.note)}
+                              title="Add Note"
+                              style={{
+                                margin: '0',
+                                fontSize: '1.2rem',
+                                padding: '0 8px',
+                                height: '28px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#3b82f6',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              +
+                            </button>
+                          )}
+                        </td>
+                        <td className="actions-cell">
+                          <div className="table-actions">
+                            {ticket.status === 'Cancelled' || ticket.status === 'Resolved' ? (
+                              // Show static badge for Cancelled or Resolved tickets
+                              <div
+                                style={{
+                                  backgroundColor: getStatusColor(ticket.status),
+                                  color: 'white',
+                                  fontWeight: '600',
+                                  padding: '6px 10px',
+                                  borderRadius: '6px',
+                                  textAlign: 'center',
+                                  minWidth: '100px',
+                                  fontSize: '0.875rem'
+                                }}
+                              >
+                                {ticket.status}
+                              </div>
+                            ) : (
+                              // Show dropdown for Pending and In Progress tickets
+                              <>
+                                <select
+                                  value={ticket.status}
+                                  onChange={(e) => handleStatusChange(ticket.id, e.target.value, ticket.userId)}
+                                  className="status-select-small"
+                                  style={{
+                                    backgroundColor: getStatusColor(ticket.status),
+                                    color: 'white',
+                                    fontWeight: '600',
+                                    border: 'none',
+                                    padding: '6px 10px',
+                                    borderRadius: '6px'
+                                  }}
+                                >
+                                  <option value="Pending" style={{ backgroundColor: '#f59e0b', color: 'white' }}>Pending</option>
+                                  <option value="In Progress" style={{ backgroundColor: '#3b82f6', color: 'white' }}>In Progress</option>
+                                  <option value="Resolved" style={{ backgroundColor: '#10b981', color: 'white' }}>Resolved</option>
+                                  <option value="Cancelled" style={{ backgroundColor: 'rgb(217, 37, 10)', color: 'white' }}>Cancelled</option>
+                                </select>
+                                <button
+                                  className="btn-cancel-small"
+                                  onClick={() => handleCancel(ticket.id, ticket.userId)}
+                                  title="Cancel ticket"
+                                >
+                                  🗑️
+                                </button>
+                              </>
+                            )}
                           </div>
-                        )}
-                        <div className="edit-row">
-                          <span className="edit-label">Assigned To</span>
-                          <input
-                            type="text"
-                            className="edit-input"
-                            value={ticketEditValues[ticket.id]?.subOption || ''}
-                            onChange={(e) => setTicketEditValues(prev => ({
-                              ...prev,
-                              [ticket.id]: { ...prev[ticket.id], subOption: e.target.value }
-                            }))}
-                            placeholder="Assigned to"
-                          />
-                        </div>
-                        <div className="edit-row full-width">
-                          <span className="edit-label">Note</span>
-                          <textarea
-                            className="edit-textarea"
-                            value={ticketEditValues[ticket.id]?.[ticket.category === 'In Stock' ? 'description' : 'note'] || ''}
-                            onChange={(e) => setTicketEditValues(prev => ({
-                              ...prev,
-                              [ticket.id]: { 
-                                ...prev[ticket.id], 
-                                [ticket.category === 'In Stock' ? 'description' : 'note']: e.target.value 
-                              }
-                            }))}
-                            placeholder="Add note..."
-                            rows="3"
-                          />
-                        </div>
-                      </div>
-                      <div className="edit-actions">
-                        <button 
-                          className="btn-save-ticket"
-                          onClick={() => handleSaveTicket(ticket.id, ticket)}
-                        >
-                          💾 Save All Changes
-                        </button>
-                        <button 
-                          className="btn-cancel-ticket"
-                          onClick={() => handleCancelEditTicket(ticket.id)}
-                        >
-                          ❌ Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    /* View Mode - Display only */
-                    <>
-                  <div className="info-section">
+                        </td>
+                        <td className="admin-cell">
+                          {ticket.createdBy ? (
+                            <span className="admin-name-table">👤 {ticket.createdBy}</span>
+                          ) : (
+                            <span className="admin-name-table unknown">Unknown</span>
+                          )}
+                        </td>
+                      </tr>
+                      {editingNote[ticket.id] && (
+                        <tr className="note-edit-row" style={{ backgroundColor: '#f9fafb' }}>
+                          <td colSpan="10" style={{ padding: '10px 20px' }}>
+                            <div className="note-edit-container" style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center', paddingRight: '0px' }}>
+                              <textarea
+                                className="note-textarea"
+                                value={noteValues[ticket.id] || ''}
+                                onChange={(e) => setNoteValues(prev => ({ ...prev, [ticket.id]: e.target.value }))}
+                                placeholder="Add a note..."
+                                autoFocus
+                                style={{ width: '100%', maxWidth: '500px', padding: '10px', borderRadius: '6px', border: '1px solid #d1d5db', minHeight: '80px' }}
+                              />
+                              <div className="note-actions" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', width: '100%', maxWidth: '500px' }}>
+                                <button
+                                  className="btn-save-note"
+                                  onClick={() => handleSaveNote(ticket.id, ticket)}
+                                  style={{ padding: '6px 12px', backgroundColor: '#10b981', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '500' }}
+                                >
+                                  Save Note
+                                </button>
+                                <button
+                                  className="btn-cancel-note"
+                                  onClick={() => handleCancelEditNote(ticket.id)}
+                                  style={{ padding: '6px 12px', backgroundColor: '#9ca3af', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: '500' }}
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card View (hidden on desktop, shown on mobile) */}
+            <div className="mobile-cards">
+              {filteredTickets.map(ticket => (
+                <div key={`mobile-${ticket.id}`} className="mobile-ticket-card">
+                  <div className="mobile-card-header">
+                    <span className="mobile-ticket-number">
+                      {ticket.category === 'Service' ? (ticket.callId ? `#${ticket.callId}` : '-') : `#${ticket.callNo || ticket.callId || ticket.ticketNumber}`}
+                    </span>
+                  </div>
+
+                  <div className="mobile-card-body">
                     {ticket.category === 'In Stock' ? (
-                      // In Stock specific fields
+                      // In Stock specific mobile fields
                       <>
-                        <div className="info-row">
-                          <span className="info-label">Product</span>
-                          <span className="info-value">{ticket.productName}</span>
+                        <div className="mobile-info-row">
+                          <span className="mobile-info-label">Product</span>
+                          <span className="mobile-info-value">{ticket.productName}</span>
                         </div>
-                        {ticket.productCode && (
-                          <div className="info-row">
-                            <span className="info-label">Product Code</span>
-                            <span className="info-value">{ticket.productCode}</span>
-                          </div>
-                        )}
                         {ticket.brand && (
-                          <div className="info-row">
-                            <span className="info-label">Brand</span>
-                            <span className="info-value">{ticket.brand}</span>
+                          <div className="mobile-info-row">
+                            <span className="mobile-info-label">Brand</span>
+                            <span className="mobile-info-value">{ticket.brand}</span>
                           </div>
                         )}
                         {ticket.model && (
-                          <div className="info-row">
-                            <span className="info-label">Model</span>
-                            <span className="info-value">{ticket.model}</span>
+                          <div className="mobile-info-row">
+                            <span className="mobile-info-label">Model</span>
+                            <span className="mobile-info-value">{ticket.model}</span>
                           </div>
                         )}
                         {ticket.defectType && (
-                          <div className="info-row">
-                            <span className="info-label">Defect Type</span>
-                            <span className="info-value">{ticket.defectType}</span>
+                          <div className="mobile-info-row">
+                            <span className="mobile-info-label">Defect Type</span>
+                            <span className="mobile-info-value">{ticket.defectType}</span>
                           </div>
                         )}
                         {ticket.quantity && (
-                          <div className="info-row">
-                            <span className="info-label">Quantity</span>
-                            <span className="info-value">{ticket.quantity}</span>
-                          </div>
-                        )}
-                        {ticket.reportedBy && (
-                          <div className="info-row">
-                            <span className="info-label">Reported By</span>
-                            <span className="info-value">{ticket.reportedBy}</span>
-                          </div>
-                        )}
-                        {ticket.dateReported && (
-                          <div className="info-row">
-                            <span className="info-label">Date Reported</span>
-                            <span className="info-value">
-                              {new Date(ticket.dateReported).toLocaleDateString('en-GB', { 
-                                day: '2-digit', 
-                                month: '2-digit', 
-                                year: 'numeric' 
-                              })}
-                            </span>
+                          <div className="mobile-info-row">
+                            <span className="mobile-info-label">Quantity</span>
+                            <span className="mobile-info-value">{ticket.quantity}</span>
                           </div>
                         )}
                       </>
                     ) : (
-                      // Regular ticket fields
+                      // Regular ticket mobile fields
                       <>
-                        <div className="info-row">
-                          <span className="info-label">Customer</span>
-                          <span className="info-value">{ticket.customerName}</span>
+                        <div className="mobile-info-row">
+                          <span className="mobile-info-label">Customer</span>
+                          <span className="mobile-info-value">{ticket.customerName}</span>
                         </div>
-                        <div className="info-row">
-                          <span className="info-label">Product</span>
-                          <span className="info-value">{ticket.productName}</span>
+                        <div className="mobile-info-row">
+                          <span className="mobile-info-label">Product</span>
+                          <span className="mobile-info-value">{ticket.productName}</span>
                         </div>
-                        {ticket.createdBy && (
-                          <div className="info-row">
-                            <span className="info-label">Created By</span>
-                            <span className="info-value admin-name">👤 {ticket.createdBy}</span>
-                          </div>
-                        )}
                       </>
+                    )}
+                    {ticket.createdBy && (
+                      <div className="mobile-info-row">
+                        <span className="mobile-info-label">Created By</span>
+                        <span className="mobile-info-value admin-name">👤 {ticket.createdBy}</span>
+                      </div>
+                    )}
+                    <div className="mobile-info-row">
+                      <span className="mobile-info-label">Assigned To</span>
+                      <span className="mobile-info-value">{ticket.subOption || "Unassigned"}</span>
+                    </div>
+                    <div className="mobile-info-row">
+                      <span className="mobile-info-label">Category</span>
+                      <span className="mobile-info-value">{ticket.category}</span>
+                    </div>
+                    <div className="mobile-info-row">
+                      <span className="mobile-info-label">Created</span>
+                      <span className="mobile-info-value">
+                        {new Date(ticket.createdAt).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })}
+                      </span>
+                    </div>
+                    {ticket.status === 'Resolved' && (ticket.resolvedAt || ticket.resolvedDate) && (
+                      <div className="mobile-info-row">
+                        <span className="mobile-info-label">Resolved</span>
+                        <span className="mobile-info-value" style={{ color: '#10b981', fontWeight: '600' }}>
+                          {new Date(ticket.resolvedAt || ticket.resolvedDate).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric'
+                          })}
+                        </span>
+                      </div>
                     )}
                   </div>
 
-                  <div className="meta-section">
-                    <div className="priority-info">
-                      <div className="meta-dates">
-                        <div className="start-date">
-                          <span className="date-label">Start:</span>
-                          <span className="date-value">
-                            {new Date(ticket.createdAt).toLocaleDateString('en-GB', { 
-                              day: '2-digit', 
-                              month: '2-digit', 
-                              year: 'numeric' 
-                            })}
-                          </span>
-                        </div>
-                        {ticket.status === 'Resolved' && (ticket.resolvedAt || ticket.resolvedDate) && (
-                          <div className="end-date resolved-date">
-                            <span className="date-label">Resolved:</span>
-                            <span className="date-value">
-                              {new Date(ticket.resolvedAt || ticket.resolvedDate).toLocaleDateString('en-GB', { 
-                                day: '2-digit', 
-                                month: '2-digit', 
-                                year: 'numeric' 
-                              })}
-                            </span>
-                          </div>
-                        )}
-                        {ticket.endDate && ticket.status !== 'Resolved' && (
-                          <div className="end-date">
-                            <span className="date-label">End:</span>
-                            <span className="date-value">
-                              {new Date(ticket.endDate).toLocaleDateString('en-GB', { 
-                                day: '2-digit', 
-                                month: '2-digit', 
-                                year: 'numeric' 
-                              })}
-                            </span>
-                          </div>
-                        )}
+                  <div className="mobile-card-actions">
+                    {ticket.status === 'Cancelled' || ticket.status === 'Resolved' ? (
+                      // Show static badge for Cancelled or Resolved tickets
+                      <div
+                        style={{
+                          backgroundColor: getStatusColor(ticket.status),
+                          color: 'white',
+                          fontWeight: '600',
+                          padding: '8px 12px',
+                          borderRadius: '6px',
+                          textAlign: 'center',
+                          width: '100%',
+                          fontSize: '0.9rem'
+                        }}
+                      >
+                        {ticket.status}
                       </div>
-                    </div>
-                    <div className="assigned-info">
-                      <span className="meta-label">Assigned To</span>
-                      <span className="meta-value">{ticket.subOption || "Unassigned"}</span>
-                      <span className="meta-category">{ticket.category}</span>
-                      {(ticket.category === "Demo" || ticket.category === "Service") && ticket.callId && (
-                        <span className="meta-call-id">Call ID: {ticket.callId}</span>
-                      )}
-                      {(ticket.category === "Demo" || ticket.category === "Service") && ticket.uniqueId && (
-                        <span className="meta-unique-id">🔑 ID: {ticket.uniqueId}</span>
-                      )}
-                    </div>
+                    ) : (
+                      // Show dropdown and cancel button for Pending and In Progress tickets
+                      <>
+                        <select
+                          value={ticket.status}
+                          onChange={(e) => handleStatusChange(ticket.id, e.target.value, ticket.userId)}
+                          className="mobile-status-select"
+                          style={{
+                            backgroundColor: getStatusColor(ticket.status),
+                            color: 'white',
+                            fontWeight: '600',
+                            border: 'none',
+                            padding: '8px 12px',
+                            borderRadius: '6px'
+                          }}
+                        >
+                          <option value="Pending" style={{ backgroundColor: '#f59e0b', color: 'white' }}>Pending</option>
+                          <option value="In Progress" style={{ backgroundColor: '#3b82f6', color: 'white' }}>In Progress</option>
+                          <option value="Resolved" style={{ backgroundColor: '#10b981', color: 'white' }}>Resolved</option>
+                          <option value="Cancelled" style={{ backgroundColor: 'rgb(217, 37, 10)', color: 'white' }}>Cancelled</option>
+                        </select>
+                        <button
+                          className="mobile-cancel-btn"
+                          onClick={() => handleCancel(ticket.id, ticket.userId)}
+                          title="Cancel ticket"
+                        >
+                          🗑️ Delete
+                        </button>
+                      </>
+                    )}
                   </div>
-                  
-                  {/* Editable Note Section */}
-                  {/* Show for Third Party & In Store: Always if note exists or when editing */}
-                  {/* Show for Demo & Service in Dashboard: Only when editing (after + button click) */}
-                  {/* Show for In Stock in Dashboard: Always if description exists or when editing */}
-                  {(ticket.status === 'Pending' || ticket.status === 'In Progress') && (
-                    // Third Party & In Store: Show if note exists OR in Tickets section
-                    ((ticket.category === 'Third Party' || ticket.category === 'In Store') && (ticket.note || !showEditableNotes || editingNote[ticket.id])) ||
-                    // In Stock in Dashboard: Show if description exists or editing
-                    (showEditableNotes && ticket.category === 'In Stock' && (ticket.description || editingNote[ticket.id])) ||
-                    // Demo & Service in Dashboard: Only show when editing (after + click)
-                    (showEditableNotes && (ticket.category === 'Demo' || ticket.category === 'Service') && editingNote[ticket.id])
-                  ) && (
-                    <div className="ticket-note-section">
-                      <div className="note-header">
-                        <span className="note-label">📝 {ticket.category === 'In Stock' ? 'Description' : 'Note'}:</span>
-                        {!editingNote[ticket.id] && (
-                          <button 
-                            className="btn-edit-note"
-                            onClick={() => handleEditNote(ticket.id, ticket.category === 'In Stock' ? ticket.description : ticket.note)}
-                            title="Edit note"
-                          >
-                            ✏️
-                          </button>
-                        )}
-                      </div>
-                      {editingNote[ticket.id] ? (
-                        <div className="note-edit-container">
-                          <textarea
-                            className="note-textarea"
-                            value={noteValues[ticket.id] || ''}
-                            onChange={(e) => setNoteValues(prev => ({ ...prev, [ticket.id]: e.target.value }))}
-                            placeholder={`Add ${ticket.category === 'In Stock' ? 'description' : 'note'} for this ticket...`}
-                            rows="3"
-                          />
-                          <div className="note-actions">
-                            <button 
-                              className="btn-save-note"
-                              onClick={() => handleSaveNote(ticket.id, ticket)}
-                            >
-                              💾 Save
-                            </button>
-                            <button 
-                              className="btn-cancel-note"
-                              onClick={() => handleCancelEditNote(ticket.id)}
-                            >
-                              ❌ Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="note-display">
-                          <span className="note-text">
-                            {(ticket.category === 'In Stock' ? ticket.description : ticket.note) || 'No note added yet. Click Edit to add one.'}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Display-only note for resolved/cancelled tickets */}
-                  {(ticket.status === 'Resolved' || ticket.status === 'Cancelled') && (ticket.note || ticket.description) && (
-                    (ticket.category === 'Third Party' || ticket.category === 'In Store' || ticket.category === 'In Stock')
-                  ) && (
-                    <div className="ticket-note">
-                      <span className="note-label">📝 {ticket.category === 'In Stock' ? 'Description' : 'Note'}:</span>
-                      <span className="note-text">{ticket.category === 'In Stock' ? ticket.description : ticket.note}</span>
-                    </div>
-                  )}
-                  </>
-                  )}
                 </div>
-
-                <div className="ticket-actions">
-                  {!editingTicket[ticket.id] && (
-                    <>
-                  <div className="action-group">
-                    <select
-                      value={ticket.status}
-                      onChange={(e) => handleStatusChange(ticket.id, e.target.value, ticket.userId)}
-                      className="status-select"
-                    >
-                      <option value="Pending">Pending</option>
-                      <option value="In Progress">In Progress</option>
-                      <option value="Resolved">Resolved</option>
-                    </select>
-                  </div>
-                  <button
-                    className="btn-cancel"
-                    onClick={() => handleCancel(ticket.id, ticket.userId)}
-                    title="Cancel ticket"
-                  >
-                    ❌ Cancel
-                  </button>
-                  </>
-                  )}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="empty-state">
-              <div className="empty-icon">📋</div>
-              <h3>No tickets found</h3>
-              <p>
-                {filterCategory 
-                  ? `No tickets found for "${getCategoryDisplayName(filterCategory)}".` 
-                  : "No tickets available."
-                }
-                {selectedDate && ` on ${new Date(selectedDate).toLocaleDateString()}`}
-              </p>
+              ))}
             </div>
-          )}
-        </div>
-        
-        {/* Loading More Indicator - Only show if there are actually more tickets */}
+          </>
+        ) : (
+          <div className="empty-state">
+            <div className="empty-icon">📋</div>
+            <h3>No tickets found</h3>
+            <p>
+              {filterCategory
+                ? `No tickets found for "${getCategoryDisplayName(filterCategory)}".`
+                : "No tickets available."
+              }
+              {(startDate || endDate) && (
+                <span>
+                  {startDate && endDate ? ` from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}` :
+                    startDate ? ` from ${new Date(startDate).toLocaleDateString()}` :
+                      ` until ${new Date(endDate).toLocaleDateString()}`}
+                </span>
+              )}
+            </p>
+          </div>
+        )}
+
+        {/* Loading More Indicator for Table View */}
         {loadingMore && hasMoreBatches() && (
           <div className="loading-more-indicator" style={{
             display: 'flex',
@@ -1576,8 +1593,8 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
             <span>Loading more tickets...</span>
           </div>
         )}
-        
-        {/* All Tickets Loaded Indicator */}
+
+        {/* All Tickets Loaded Indicator for Table View */}
         {!hasMoreBatches() && displayedTickets.length > 0 && !loadingMore && (
           <div className="no-more-tickets" style={{
             textAlign: 'center',
@@ -1590,313 +1607,9 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
             All tickets loaded ({displayedTickets.length} of {allTickets.length})
           </div>
         )}
-        </>
-      ) : (
-        <div className="tickets-table-container">
-          {filteredTickets.length > 0 ? (
-            <>
-              {/* Desktop Table View */}
-              <div className="table-responsive">
-                <table className="tickets-table">
-                  <thead>
-                    <tr>
-                      <th>Call No</th>
-                      <th>Customer/Product</th>
-                      <th>Product/Details</th>
-                      <th>Created By</th>
-                      <th>Status</th>
-                      <th>Assigned To</th>
-                      <th>Category</th>
-                      <th>Call ID</th>
-                      <th>Unique ID</th>
-                      <th>Created Date</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTickets.map(ticket => (
-                      <tr key={ticket.id} className="table-row">
-                        <td className="ticket-number-cell">#{ticket.callNo || ticket.callId || ticket.ticketNumber}</td>
-                        <td className="customer-cell">
-                          {ticket.category === 'In Stock' ? ticket.productName : ticket.customerName}
-                        </td>
-                        <td className="product-cell">
-                          {ticket.category === 'In Stock' ? (
-                            <div style={{ fontSize: '0.85rem' }}>
-                              {ticket.brand && <div><strong>Brand:</strong> {ticket.brand}</div>}
-                              {ticket.model && <div><strong>Model:</strong> {ticket.model}</div>}
-                              {ticket.defectType && <div><strong>Defect:</strong> {ticket.defectType}</div>}
-                              {ticket.quantity && <div><strong>Qty:</strong> {ticket.quantity}</div>}
-                            </div>
-                          ) : (
-                            ticket.productName
-                          )}
-                        </td>
-                        <td className="admin-cell">
-                          {ticket.createdBy ? (
-                            <span className="admin-name-table">👤 {ticket.createdBy}</span>
-                          ) : (
-                            <span className="admin-name-table unknown">Unknown</span>
-                          )}
-                        </td>
-                        <td className="status-cell">
-                          <div 
-                            className="status-badge-small" 
-                            style={{ backgroundColor: getStatusColor(ticket.status) }}
-                          >
-                            <span className="status-icon">{getStatusIcon(ticket.status)}</span>
-                            {ticket.status}
-                          </div>
-                        </td>
-                        <td className="assigned-cell">{ticket.subOption || "Unassigned"}</td>
-                        <td className="category-cell">{ticket.category}</td>
-                        <td className="call-id-cell">
-                          {(ticket.category === "Demo" || ticket.category === "Service") 
-                            ? (ticket.callId || 'N/A') 
-                            : '-'
-                          }
-                        </td>
-                        <td className="unique-id-cell">
-                          {(ticket.category === "Demo" || ticket.category === "Service") 
-                            ? (ticket.uniqueId || 'N/A') 
-                            : '-'
-                          }
-                        </td>
-                        <td className="date-cell">
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                            <div>
-                              <small style={{ color: '#6b7280', fontSize: '0.75rem' }}>Start: </small>
-                              {new Date(ticket.createdAt).toLocaleDateString('en-GB', { 
-                                day: '2-digit', 
-                                month: '2-digit', 
-                                year: 'numeric' 
-                              })}
-                            </div>
-                            {ticket.status === 'Resolved' && (ticket.resolvedAt || ticket.resolvedDate) && (
-                              <div style={{ color: '#10b981', fontWeight: '600' }}>
-                                <small style={{ color: '#059669', fontSize: '0.75rem' }}>Resolved: </small>
-                                {new Date(ticket.resolvedAt || ticket.resolvedDate).toLocaleDateString('en-GB', { 
-                                  day: '2-digit', 
-                                  month: '2-digit', 
-                                  year: 'numeric' 
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="actions-cell">
-                          <div className="table-actions">
-                            <select
-                              value={ticket.status}
-                              onChange={(e) => handleStatusChange(ticket.id, e.target.value, ticket.userId)}
-                              className="status-select-small"
-                            >
-                              <option value="Pending">Pending</option>
-                              <option value="In Progress">In Progress</option>
-                              <option value="Resolved">Resolved</option>
-                            </select>
-                            <button
-                              className="btn-cancel-small"
-                              onClick={() => handleCancel(ticket.id, ticket.userId)}
-                              title="Cancel ticket"
-                            >
-                              ❌
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+      </div>
 
-              {/* Mobile Card View (hidden on desktop, shown on mobile) */}
-              <div className="mobile-cards">
-                {filteredTickets.map(ticket => (
-                  <div key={`mobile-${ticket.id}`} className="mobile-ticket-card">
-                    <div className="mobile-card-header">
-                      <span className="mobile-ticket-number">#{ticket.callNo || ticket.callId || ticket.ticketNumber}</span>
-                      <div 
-                        className="status-badge-small" 
-                        style={{ backgroundColor: getStatusColor(ticket.status) }}
-                      >
-                        <span className="status-icon">{getStatusIcon(ticket.status)}</span>
-                        {ticket.status}
-                      </div>
-                    </div>
 
-                    <div className="mobile-card-body">
-                      {ticket.category === 'In Stock' ? (
-                        // In Stock specific mobile fields
-                        <>
-                          <div className="mobile-info-row">
-                            <span className="mobile-info-label">Product</span>
-                            <span className="mobile-info-value">{ticket.productName}</span>
-                          </div>
-                          {ticket.brand && (
-                            <div className="mobile-info-row">
-                              <span className="mobile-info-label">Brand</span>
-                              <span className="mobile-info-value">{ticket.brand}</span>
-                            </div>
-                          )}
-                          {ticket.model && (
-                            <div className="mobile-info-row">
-                              <span className="mobile-info-label">Model</span>
-                              <span className="mobile-info-value">{ticket.model}</span>
-                            </div>
-                          )}
-                          {ticket.defectType && (
-                            <div className="mobile-info-row">
-                              <span className="mobile-info-label">Defect Type</span>
-                              <span className="mobile-info-value">{ticket.defectType}</span>
-                            </div>
-                          )}
-                          {ticket.quantity && (
-                            <div className="mobile-info-row">
-                              <span className="mobile-info-label">Quantity</span>
-                              <span className="mobile-info-value">{ticket.quantity}</span>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        // Regular ticket mobile fields
-                        <>
-                          <div className="mobile-info-row">
-                            <span className="mobile-info-label">Customer</span>
-                            <span className="mobile-info-value">{ticket.customerName}</span>
-                          </div>
-                          <div className="mobile-info-row">
-                            <span className="mobile-info-label">Product</span>
-                            <span className="mobile-info-value">{ticket.productName}</span>
-                          </div>
-                        </>
-                      )}
-                      {ticket.createdBy && (
-                        <div className="mobile-info-row">
-                          <span className="mobile-info-label">Created By</span>
-                          <span className="mobile-info-value admin-name">👤 {ticket.createdBy}</span>
-                        </div>
-                      )}
-                      <div className="mobile-info-row">
-                        <span className="mobile-info-label">Assigned To</span>
-                        <span className="mobile-info-value">{ticket.subOption || "Unassigned"}</span>
-                      </div>
-                      <div className="mobile-info-row">
-                        <span className="mobile-info-label">Category</span>
-                        <span className="mobile-info-value">{ticket.category}</span>
-                      </div>
-                      <div className="mobile-info-row">
-                        <span className="mobile-info-label">Created</span>
-                        <span className="mobile-info-value">
-                          {new Date(ticket.createdAt).toLocaleDateString('en-GB', { 
-                            day: '2-digit', 
-                            month: '2-digit', 
-                            year: 'numeric' 
-                          })}
-                        </span>
-                      </div>
-                      {ticket.status === 'Resolved' && (ticket.resolvedAt || ticket.resolvedDate) && (
-                        <div className="mobile-info-row">
-                          <span className="mobile-info-label">Resolved</span>
-                          <span className="mobile-info-value" style={{ color: '#10b981', fontWeight: '600' }}>
-                            {new Date(ticket.resolvedAt || ticket.resolvedDate).toLocaleDateString('en-GB', { 
-                              day: '2-digit', 
-                              month: '2-digit', 
-                              year: 'numeric' 
-                            })}
-                          </span>
-                        </div>
-                      )}
-                      {(ticket.category === "Demo" || ticket.category === "Service") && ticket.callId && (
-                        <div className="mobile-info-row">
-                          <span className="mobile-info-label">Call ID</span>
-                          <span className="mobile-info-value">{ticket.callId}</span>
-                        </div>
-                      )}
-                      {(ticket.category === "Demo" || ticket.category === "Service") && ticket.uniqueId && (
-                        <div className="mobile-info-row">
-                          <span className="mobile-info-label">Unique ID</span>
-                          <span className="mobile-info-value">{ticket.uniqueId}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mobile-card-actions">
-                      <select
-                        value={ticket.status}
-                        onChange={(e) => handleStatusChange(ticket.id, e.target.value, ticket.userId)}
-                        className="mobile-status-select"
-                      >
-                        <option value="Pending">Pending</option>
-                        <option value="In Progress">In Progress</option>
-                        <option value="Resolved">Resolved</option>
-                      </select>
-                      <button
-                        className="mobile-cancel-btn"
-                        onClick={() => handleCancel(ticket.id, ticket.userId)}
-                        title="Cancel ticket"
-                      >
-                        ❌ Cancel
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="empty-state">
-              <div className="empty-icon">📋</div>
-              <h3>No tickets found</h3>
-              <p>
-                {filterCategory 
-                  ? `No tickets found for "${getCategoryDisplayName(filterCategory)}".` 
-                  : "No tickets available."
-                }
-                {selectedDate && ` on ${new Date(selectedDate).toLocaleDateString()}`}
-              </p>
-            </div>
-          )}
-          
-          {/* Loading More Indicator for Table View */}
-          {loadingMore && hasMoreBatches() && (
-            <div className="loading-more-indicator" style={{
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: '40px 20px',
-              fontSize: '18px',
-              color: '#6b7280',
-              fontWeight: '500',
-              gap: '12px'
-            }}>
-              <div style={{
-                width: '24px',
-                height: '24px',
-                border: '3px solid #e5e7eb',
-                borderTop: '3px solid #3b82f6',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite'
-              }}></div>
-              <span>Loading more tickets...</span>
-            </div>
-          )}
-          
-          {/* All Tickets Loaded Indicator for Table View */}
-          {!hasMoreBatches() && displayedTickets.length > 0 && !loadingMore && (
-            <div className="no-more-tickets" style={{
-              textAlign: 'center',
-              padding: '30px 20px',
-              fontSize: '16px',
-              color: '#9ca3af',
-              fontWeight: '500'
-            }}>
-              <span style={{ fontSize: '24px', marginRight: '8px' }}>🏁</span>
-              All tickets loaded ({displayedTickets.length} of {allTickets.length})
-            </div>
-          )}
-        </div>
-      )}
-      
       <Notification
         message={notification.message}
         type={notification.type}
@@ -1918,7 +1631,62 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         cancelText="Cancel"
         type={confirmDialog.type === 'delete' ? 'danger' : 'warning'}
       />
-    </div>
+
+      {/* Add Customer Modal */}
+      {
+        showAddCustomerAction && showAddCustomerModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.7)',
+            zIndex: 2000,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '20px'
+          }}>
+            <div style={{
+              background: '#f8f9fa',
+              borderRadius: '12px',
+              width: '95%',
+              maxWidth: '1200px',
+              height: '90vh',
+              overflowY: 'auto',
+              position: 'relative',
+              boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+            }}>
+              <div style={{ position: 'absolute', right: '15px', top: '15px', zIndex: 100 }}>
+                <button
+                  onClick={() => setShowAddCustomerModal(false)}
+                  style={{
+                    background: 'white',
+                    border: 'none',
+                    borderRadius: '50%',
+                    width: '32px',
+                    height: '32px',
+                    fontSize: '1.2rem',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#666'
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+              <AddCustomer onBack={() => setShowAddCustomerModal(false)} />
+            </div>
+          </div>
+        )
+      }
+
+
+    </div >
   );
 };
 

@@ -55,8 +55,8 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard">
-     
-     {/* Section cards */}
+
+      {/* Section cards */}
       <div className="dashboard-sections">
         {sections.map(section => (
           <div
@@ -74,16 +74,16 @@ const Dashboard = () => {
       {/* In Stock Form or Tickets Section */}
       <div style={{ marginTop: "30px" }}>
         {showInStockForm ? (
-          <AddInStockProduct 
+          <AddInStockProduct
             onBack={handleBackFromInStock}
             onProductAdded={handleInStockProductAdded}
           />
         ) : (
           <>
-            <div style={{ 
-              marginBottom: "20px", 
-              display: "flex", 
-              justifyContent: "space-between", 
+            <div style={{
+              marginBottom: "20px",
+              display: "flex",
+              justifyContent: "space-between",
               alignItems: "center",
               gap: "15px",
               flexWrap: "wrap"
@@ -93,14 +93,14 @@ const Dashboard = () => {
               </h2>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                 {filterCategory === 'in stock' && (
-                  <button 
+                  <button
                     className="btn-primary"
                     onClick={() => {
                       setShowInStockForm(true);
                       setShowTickets(false);
                     }}
-                    style={{ 
-                      padding: "8px 16px", 
+                    style={{
+                      padding: "8px 16px",
                       fontSize: "0.95rem",
                       whiteSpace: "nowrap",
                       borderRadius: "6px",
@@ -119,19 +119,19 @@ const Dashboard = () => {
                 )}
               </div>
             </div>
-            <Tickets 
-              key="tickets-main" 
-              filterCategory={filterCategory} 
-              excludeResolved={filterCategory === 'in stock' ? false : excludeResolved} 
-              showStatusFilter={false} 
+            <Tickets
+              key="tickets-main"
+              filterCategory={filterCategory}
+              excludeResolved={filterCategory === 'in stock' ? false : excludeResolved}
+              showStatusFilter={false}
               showEditableNotes={true}
               inStockStatusFilter={filterCategory === 'in stock' ? inStockStatusFilter : null}
               setInStockStatusFilter={setInStockStatusFilter}
+              showAddCustomerAction={true}
             />
           </>
         )}
       </div>
-
     </div>
   );
 };
