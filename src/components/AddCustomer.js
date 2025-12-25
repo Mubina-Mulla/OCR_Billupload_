@@ -10,7 +10,7 @@ import useNotification from '../hooks/useNotification';
 import { parsePdfToData } from '../utils/pdfParser';
 import './AddCustomer.css';
 
-const AddCustomer = ({ onBack }) => {
+const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false }) => {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
@@ -289,6 +289,13 @@ const AddCustomer = ({ onBack }) => {
       localStorage.removeItem('tempProducts');
       localStorage.removeItem('customerFormData');
       showNotification(`Customer "${savedCustomer.name}" added successfully with ${tempProducts.length} products!`, 'success');
+      
+      // Auto-close modal and return to Dashboard if autoClose is enabled
+      if (autoClose && onBack) {
+        setTimeout(() => {
+          onBack();
+        }, 1000); // Small delay to show success message
+      }
 
     } catch (error) {
       console.error('Error adding customer:', error);
@@ -553,7 +560,7 @@ const AddCustomer = ({ onBack }) => {
             </button>
           )}
           <button className="btn-primary" onClick={onBack}>
-            <span className="btn-icon">←</span> Back to Customers
+            <span className="btn-icon">←</span> {backText}
           </button>
         </div>
       </div>
@@ -786,7 +793,7 @@ const AddCustomer = ({ onBack }) => {
                 </button>
               )}
               <button type="button" className="btn-secondary" onClick={onBack}>
-                Back to Customers
+                {backText}
               </button>
             </div>
 

@@ -239,6 +239,8 @@ const AddTicket = ({
             ...prev,
             subOption: matchingCenter.serviceCenterName || matchingCenter.name
           }));
+        } else {
+          console.log('⚠️ No matching service center found for:', productCompany);
         }
       }
     }
@@ -255,6 +257,23 @@ const AddTicket = ({
         commissionAmount: "",
         amountReceived: "",
       }));
+    } else if (name === "subOption" && value) {
+      // When technician is selected, populate default amounts
+      const selectedTech = technicians.find(tech => tech.name === value);
+      console.log('🔍 Selected Technician:', selectedTech);
+      console.log('💰 Default Service Amount:', selectedTech?.defaultServiceAmount);
+      console.log('💵 Default Commission Amount:', selectedTech?.defaultCommissionAmount);
+      
+      if (selectedTech && (selectedTech.defaultServiceAmount || selectedTech.defaultCommissionAmount)) {
+        setFormData((prev) => ({
+          ...prev,
+          [name]: value,
+          serviceAmount: selectedTech.defaultServiceAmount?.toString() || "",
+          commissionAmount: selectedTech.defaultCommissionAmount?.toString() || ""
+        }));
+      } else {
+        setFormData((prev) => ({ ...prev, [name]: value }));
+      }
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
     }
@@ -564,7 +583,7 @@ const AddTicket = ({
                       onChange={handleChange}
                       required
                     >
-                      <option value="">✓ Select Service Center</option>
+                      <option value="">Navaratna Distributors</option>
                       {filteredServiceCenters.length > 0 ? (
                         <>
                           {matchingCenters.length > 0 && (

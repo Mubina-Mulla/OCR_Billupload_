@@ -13,6 +13,7 @@ function TechForm({ tech, onClose, onTechAdded, onBack, fullPage = false }) {
   const [skills, setSkills] = useState("");
   const [userId, setUserId] = useState("");
   const [password, setPassword] = useState("");
+  const [defaultCommissionAmount, setDefaultCommissionAmount] = useState("");
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { notification, showNotification, hideNotification } = useNotification();
@@ -32,6 +33,7 @@ function TechForm({ tech, onClose, onTechAdded, onBack, fullPage = false }) {
       setSkills(tech.skills?.join(", ") || "");
       setUserId(tech.userId || "");
       setPassword(tech.password || "");
+      setDefaultCommissionAmount(tech.defaultCommissionAmount || "");
     }
   }, [tech]);
 
@@ -75,6 +77,7 @@ function TechForm({ tech, onClose, onTechAdded, onBack, fullPage = false }) {
       address: address.trim(),
       userId: userId.trim(),
       password: password.trim(),
+      defaultCommissionAmount: defaultCommissionAmount ? parseFloat(defaultCommissionAmount) : 0,
       assignedTickets: tech?.assignedTickets || [],
     };
 
@@ -196,6 +199,19 @@ function TechForm({ tech, onClose, onTechAdded, onBack, fullPage = false }) {
                     placeholder="e.g. Hardware Repair, Software Installation, Network Setup"
                   />
                 </div>
+
+                <div className="form-group">
+                  <label>Default Commission Amount</label>
+                  <input 
+                    type="number"
+                    value={defaultCommissionAmount} 
+                    onChange={(e) => setDefaultCommissionAmount(e.target.value)} 
+                    placeholder="Enter default commission amount"
+                    min="0"
+                    step="0.01"
+                  />
+                  <small style={{color: '#6b7280', fontSize: '0.85rem'}}>This will be auto-filled when creating tickets</small>
+                </div>
               </div>
 
               <div className="form-actions">
@@ -255,8 +271,42 @@ function TechForm({ tech, onClose, onTechAdded, onBack, fullPage = false }) {
           )}
           {errors.phone && <span className="error-text">{errors.phone}</span>}
 
+          <label>User ID *</label>
+          <input 
+            type="text"
+            value={userId} 
+            onChange={(e) => setUserId(e.target.value)} 
+            placeholder="Enter user ID"
+            required
+          />
+          {errors.userId && <span className="error-text">{errors.userId}</span>}
+
+          <label>Password *</label>
+          <input 
+            type="password"
+            value={password} 
+            onChange={(e) => setPassword(e.target.value)} 
+            placeholder="Enter password (min 6 characters)"
+            minLength="6"
+            required
+          />
+          {errors.password && <span className="error-text">{errors.password}</span>}
+
           <label>Skills (comma separated)</label>
           <input value={skills} onChange={(e) => setSkills(e.target.value)} />
+
+          <label>Default Commission Amount</label>
+          <input 
+            type="number"
+            value={defaultCommissionAmount} 
+            onChange={(e) => setDefaultCommissionAmount(e.target.value)} 
+            placeholder="Enter default commission amount"
+            min="0"
+            step="0.01"
+          />
+          <small style={{color: '#6b7280', fontSize: '0.85rem', display: 'block', marginTop: '-8px', marginBottom: '12px'}}>
+            This will be auto-filled when creating tickets
+          </small>
 
           <div className="form-actions">
             <button type="button" onClick={onClose}>

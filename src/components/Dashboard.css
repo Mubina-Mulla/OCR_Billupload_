@@ -8,9 +8,9 @@
 /* Section grid - responsive */
 .dashboard-sections {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); /* flexible */
+  grid-template-columns: repeat(5, 1fr); /* 5 cards in one line */
   gap: 1rem;
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
 }
 

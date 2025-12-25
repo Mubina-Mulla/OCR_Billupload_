@@ -1206,14 +1206,13 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                 <thead>
                   <tr>
                     <th>Call No</th>
-                    <th>Customer/Product</th>
-                    <th>Phone No</th>
+                    <th>Phone No / Customer</th>
                     <th>Product/Details</th>
                     <th>Assigned To</th>
                     <th>Category</th>
                     <th>Created Date</th>
-                    <th>Note</th>
                     <th>Actions</th>
+                    <th>Note</th>
                     <th>Created By</th>
                   </tr>
                 </thead>
@@ -1224,11 +1223,15 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                         <td className="ticket-number-cell">
                           {ticket.category === 'Service' ? (ticket.callId ? `#${ticket.callId}` : '-') : `#${ticket.callNo || ticket.callId || ticket.ticketNumber}`}
                         </td>
-                        <td className="customer-cell">
-                          {ticket.category === 'In Stock' ? ticket.productName : ticket.customerName}
-                        </td>
                         <td className="phone-cell">
-                          {ticket.phoneNumber || ticket.phone || ticket.contactNumber || '-'}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <div style={{ fontWeight: '600', color: '#1f2937' }}>
+                              {ticket.phoneNumber || ticket.phone || ticket.contactNumber || '-'}
+                            </div>
+                            <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>
+                              {ticket.category === 'In Stock' ? ticket.productName : ticket.customerName}
+                            </div>
+                          </div>
                         </td>
                         <td className="product-cell">
                           {ticket.category === 'In Stock' ? (
@@ -1266,47 +1269,6 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                               </div>
                             )}
                           </div>
-                        </td>
-                        <td className="note-cell" style={{ textAlign: 'left' }}>
-                          {(ticket.category === 'In Stock' ? ticket.description : ticket.note) ? (
-                            <div
-                              onClick={() => handleEditNote(ticket.id, ticket.category === 'In Stock' ? ticket.description : ticket.note)}
-                              title="Click to edit note"
-                              style={{
-                                cursor: 'pointer',
-                                whiteSpace: 'pre-wrap',
-                                fontSize: '0.8rem',
-                                color: '#374151',
-                                textAlign: 'left',
-                                minWidth: '200px',
-                                lineHeight: '1.4'
-                              }}
-                            >
-                              {ticket.category === 'In Stock' ? ticket.description : ticket.note}
-                            </div>
-                          ) : (
-                            <button
-                              className="btn-edit-note"
-                              onClick={() => handleEditNote(ticket.id, ticket.category === 'In Stock' ? ticket.description : ticket.note)}
-                              title="Add Note"
-                              style={{
-                                margin: '0',
-                                fontSize: '1.2rem',
-                                padding: '0 8px',
-                                height: '28px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                backgroundColor: '#3b82f6',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '4px',
-                                cursor: 'pointer'
-                              }}
-                            >
-                              +
-                            </button>
-                          )}
                         </td>
                         <td className="actions-cell">
                           <div className="table-actions">
@@ -1358,6 +1320,47 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                             )}
                           </div>
                         </td>
+                        <td className="note-cell" style={{ textAlign: 'left' }}>
+                          {(ticket.category === 'In Stock' ? ticket.description : ticket.note) ? (
+                            <div
+                              onClick={() => handleEditNote(ticket.id, ticket.category === 'In Stock' ? ticket.description : ticket.note)}
+                              title="Click to edit note"
+                              style={{
+                                cursor: 'pointer',
+                                whiteSpace: 'pre-wrap',
+                                fontSize: '0.8rem',
+                                color: '#374151',
+                                textAlign: 'left',
+                                minWidth: '200px',
+                                lineHeight: '1.4'
+                              }}
+                            >
+                              {ticket.category === 'In Stock' ? ticket.description : ticket.note}
+                            </div>
+                          ) : (
+                            <button
+                              className="btn-edit-note"
+                              onClick={() => handleEditNote(ticket.id, ticket.category === 'In Stock' ? ticket.description : ticket.note)}
+                              title="Add Note"
+                              style={{
+                                margin: '0',
+                                fontSize: '1.2rem',
+                                padding: '0 8px',
+                                height: '28px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                backgroundColor: '#3b82f6',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              +
+                            </button>
+                          )}
+                        </td>
                         <td className="admin-cell">
                           {ticket.createdBy ? (
                             <span className="admin-name-table">👤 {ticket.createdBy}</span>
@@ -1368,7 +1371,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                       </tr>
                       {editingNote[ticket.id] && (
                         <tr className="note-edit-row" style={{ backgroundColor: '#f9fafb' }}>
-                          <td colSpan="10" style={{ padding: '10px 20px' }}>
+                          <td colSpan="9" style={{ padding: '10px 20px' }}>
                             <div className="note-edit-container" style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center', paddingRight: '0px' }}>
                               <textarea
                                 className="note-textarea"
@@ -1451,8 +1454,13 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                       // Regular ticket mobile fields
                       <>
                         <div className="mobile-info-row">
-                          <span className="mobile-info-label">Customer</span>
-                          <span className="mobile-info-value">{ticket.customerName}</span>
+                          <span className="mobile-info-label">Phone / Customer</span>
+                          <span className="mobile-info-value">
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <div style={{ fontWeight: '600' }}>{ticket.phoneNumber || ticket.phone || ticket.contactNumber || '-'}</div>
+                              <div style={{ fontSize: '0.85rem', color: '#6b7280' }}>{ticket.customerName}</div>
+                            </div>
+                          </span>
                         </div>
                         <div className="mobile-info-row">
                           <span className="mobile-info-label">Product</span>
@@ -1679,7 +1687,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                   ✕
                 </button>
               </div>
-              <AddCustomer onBack={() => setShowAddCustomerModal(false)} />
+              <AddCustomer onBack={() => setShowAddCustomerModal(false)} backText="Back to Dashboard" autoClose={true} />
             </div>
           </div>
         )
