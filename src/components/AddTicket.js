@@ -93,7 +93,7 @@ const AddTicket = ({
     status: "Pending",
     serviceAmount: "",
     commissionAmount: "",
-    amountReceived: "",
+    amountReceived: "By Technician",
     note: "",
     createdAt: new Date().toISOString(),
     endDate: "",
@@ -194,6 +194,7 @@ const AddTicket = ({
         ...ticketData,
         ticketNumber: ticketData.ticketNumber || generateTicketNumber(),
         createdAt: ticketData.createdAt || new Date().toISOString(),
+        amountReceived: ticketData.amountReceived || "By Technician",
       });
     } else if (prefilledData) {
       setFormData((prev) => ({
@@ -206,11 +207,13 @@ const AddTicket = ({
         brand: prefilledData.brand || "",
         model: prefilledData.model || "",
         price: prefilledData.price || "",
+        amountReceived: prev.amountReceived || "By Technician",
       }));
     } else if (productData?.serialNumber) {
       setFormData((prev) => ({
         ...prev,
         serialNumber: productData.serialNumber,
+        amountReceived: prev.amountReceived || "By Technician",
       }));
     }
   }, [ticketData, productData, customer, prefilledData]);
@@ -249,13 +252,14 @@ const AddTicket = ({
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === "category") {
+      const isThirdPartyOrInStore = value === "Third Party" || value === "In Store";
       setFormData((prev) => ({
         ...prev,
         [name]: value,
         subOption: "",
         serviceAmount: "",
         commissionAmount: "",
-        amountReceived: "",
+        amountReceived: isThirdPartyOrInStore ? "By Technician" : "",
       }));
     } else if (name === "subOption" && value) {
       // When technician is selected, populate default amounts
@@ -703,7 +707,6 @@ const AddTicket = ({
                       value={formData.amountReceived}
                       onChange={handleChange}
                     >
-                      <option value="">Select Option</option>
                       {receivedOptions.map((opt, idx) => (
                         <option key={idx} value={opt}>
                           {opt}
