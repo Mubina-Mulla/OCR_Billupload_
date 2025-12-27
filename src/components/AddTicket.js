@@ -243,7 +243,20 @@ const AddTicket = ({
             subOption: matchingCenter.serviceCenterName || matchingCenter.name
           }));
         } else {
-          console.log('⚠️ No matching service center found for:', productCompany);
+          // No match found - use Navaratna Distributors as default
+          const defaultCenter = serviceCenters.find(center => 
+            (center.serviceCenterName || center.name || '').includes('Navaratn Distributors')
+          );
+          
+          if (defaultCenter) {
+            console.log('🏪 Using default service center:', defaultCenter.serviceCenterName || defaultCenter.name);
+            setFormData(prev => ({
+              ...prev,
+              subOption: defaultCenter.serviceCenterName || defaultCenter.name
+            }));
+          } else {
+            console.log('⚠️ No matching service center found for:', productCompany);
+          }
         }
       }
     }
@@ -253,10 +266,11 @@ const AddTicket = ({
     const { name, value } = e.target;
     if (name === "category") {
       const isThirdPartyOrInStore = value === "Third Party" || value === "In Store";
+      const isDemoOrService = value === "Demo" || value === "Service";
       setFormData((prev) => ({
         ...prev,
         [name]: value,
-        subOption: "",
+        subOption: isDemoOrService ? "Navaratn Distributors - Navaratn Distributors sangli" : "",
         serviceAmount: "",
         commissionAmount: "",
         amountReceived: isThirdPartyOrInStore ? "By Technician" : "",
@@ -587,7 +601,7 @@ const AddTicket = ({
                       onChange={handleChange}
                       required
                     >
-                      <option value="">Navaratna Distributors</option>
+                      <option value="Navaratn Distributors - Navaratn Distributors sangli">Navaratn Distributors - Navaratn Distributors sangli</option>
                       {filteredServiceCenters.length > 0 ? (
                         <>
                           {matchingCenters.length > 0 && (
