@@ -258,6 +258,151 @@
   color: #dc2626;
 }
 
+/* Wallet Summary Section */
+.wallet-summary-section {
+  margin-bottom: 30px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  border-radius: 12px;
+}
+
+.wallet-summary-section h3 {
+  margin: 0 0 20px 0;
+  font-size: 1.2rem;
+  color: #1f2937;
+  font-weight: 700;
+}
+
+.summary-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.summary-card {
+  background: white;
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+}
+
+.summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+}
+
+.summary-card.credit-card {
+  border-left: 4px solid #16a34a;
+}
+
+.summary-card.debit-card {
+  border-left: 4px solid #dc2626;
+}
+
+.summary-card.balance-card {
+  border-left: 4px solid #667eea;
+}
+
+.summary-card.balance-card.positive {
+  background: linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%);
+  border-left: 4px solid #16a34a;
+}
+
+.summary-card.balance-card.negative {
+  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+  border-left: 4px solid #dc2626;
+}
+
+.card-icon {
+  font-size: 2.5rem;
+  margin-bottom: 10px;
+}
+
+.card-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+
+.card-amount {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #1f2937;
+  margin-bottom: 5px;
+}
+
+.card-status {
+  font-size: 0.75rem;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+/* Transaction Tabs */
+.transaction-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.tab-btn {
+  padding: 12px 24px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.tab-btn:hover {
+  color: #667eea;
+}
+
+.tab-btn.active {
+  color: #667eea;
+  border-bottom-color: #667eea;
+}
+
+/* Category Badge */
+.category-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.category-badge.third-party {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.category-badge.in-store {
+  background: #fce7f3;
+  color: #9f1239;
+}
+
+.transactions-table .amount.credit {
+  color: #16a34a;
+  font-weight: 700;
+}
+
+.transactions-table .amount.debit {
+  color: #dc2626;
+  font-weight: 700;
+}
+
 /* Responsive Design */
 @media (max-width: 768px) {
   .history-modal-content {
@@ -281,5 +426,17 @@
 
   .history-summary {
     flex-direction: column;
+  }
+  
+  .summary-cards {
+    grid-template-columns: 1fr;
+  }
+  
+  .transaction-tabs {
+    flex-direction: column;
+  }
+  
+  .tab-btn {
+    text-align: left;
   }
 }

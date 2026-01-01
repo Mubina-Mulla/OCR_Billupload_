@@ -1246,7 +1246,16 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                           )}
                         </td>
                         <td className="assigned-cell">{ticket.subOption || "Unassigned"}</td>
-                        <td className="category-cell">{ticket.category}</td>
+                        <td className="category-cell">
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                            <div style={{ fontWeight: '600', color: '#1f2937' }}>{ticket.category}</div>
+                            {ticket.complaintType && (
+                              <div style={{ fontSize: '0.8rem', color: '#6b7280', fontStyle: 'italic' }}>
+                                {ticket.complaintType}
+                              </div>
+                            )}
+                          </div>
+                        </td>
 
                         <td className="date-cell">
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

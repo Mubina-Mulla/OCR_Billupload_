@@ -363,6 +363,13 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
   const handleTicketAdded = () => {
     setShowAddTicket(false);
     showNotification('Ticket raised successfully!', 'success');
+    
+    // Auto-close the entire modal and return to Dashboard if autoClose is enabled
+    if (autoClose && onBack) {
+      setTimeout(() => {
+        onBack();
+      }, 1000); // Small delay to show success message
+    }
   };
 
   const handleShowBillGenerator = () => {

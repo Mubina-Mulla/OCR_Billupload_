@@ -219,32 +219,75 @@ const TechnicianPortal = () => {
   // );
 
   // Calculate wallet balance
-  const inStoreTotal = techTickets.reduce((sum, ticket) => {
-    if (ticket.category === "In Store") {
-      const serviceAmount = parseFloat(ticket.serviceAmount) || 0;
-      const commissionAmount = parseFloat(ticket.commissionAmount) || 0;
-      return sum + (serviceAmount - commissionAmount);
-    }
-    return sum;
+  // Third Party: CREDIT service amount (tech collects from customer), DEBIT commission (tech owes store)
+  // In Store: CREDIT commission amount (tech earns from store)
+  
+  const thirdPartyTickets = techTickets.filter(t => t.category === "Third Party");
+  const inStoreTickets = techTickets.filter(t => t.category === "In Store");
+  
+  // Third Party: Credit service amount
+  const thirdPartyServiceTotal = thirdPartyTickets.reduce((sum, ticket) => {
+    const serviceAmount = parseFloat(ticket.serviceAmount) || 0;
+    return sum + serviceAmount;
   }, 0);
 
-  const thirdPartyCommissions = techTickets.reduce((sum, ticket) => {
-    if (ticket.category === "Third Party") {
-      const commissionAmount = parseFloat(ticket.commissionAmount) || 0;
-      return sum + commissionAmount;
-    }
-    return sum;
+  // Third Party: Debit commission amount
+  const thirdPartyCommissionTotal = thirdPartyTickets.reduce((sum, ticket) => {
+    const commissionAmount = parseFloat(ticket.commissionAmount) || 0;
+    return sum + commissionAmount;
   }, 0);
 
-  const totalTicketAmount = inStoreTotal - thirdPartyCommissions;
+  // In Store: CREDIT (commission earned)
+  const inStoreTotal = inStoreTickets.reduce((sum, ticket) => {
+    const commissionAmount = parseFloat(ticket.commissionAmount) || 0;
+    return sum + commissionAmount;
+  }, 0);
 
-  let customerBalance = 0;
-  if (techTickets.length > 0) {
-    const customerTrans = customerTransactions.filter(trans => trans.technicianId === loggedInTech.id);
-    const credits = customerTrans.filter(t => t.type === 'credit').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
-    const debits = customerTrans.filter(t => t.type === 'debit').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
-    customerBalance = totalTicketAmount + credits - debits;
-  }
+  // Wallet Balance = (Third Party Service + In Store Commission) - Third Party Commission
+  const walletBalance = thirdPartyServiceTotal + inStoreTotal - thirdPartyCommissionTotal;
+  
+  // Transaction history for display
+  const transactionHistory = [
+    ...inStoreTickets.map(ticket => ({
+      id: ticket.id + '_commission',
+      ticketNumber: ticket.ticketNumber || ticket.id,
+      type: 'credit',
+      category: 'In Store',
+      amount: parseFloat(ticket.commissionAmount) || 0,
+      customerName: ticket.customerName,
+      productName: ticket.productName,
+      date: ticket.createdDate || ticket.createdAt || ticket.timestamp,
+      description: `Commission earned - Ticket #${ticket.ticketNumber || ticket.id}`
+    })),
+    ...thirdPartyTickets.flatMap(ticket => [
+      {
+        id: ticket.id + '_service',
+        ticketNumber: ticket.ticketNumber || ticket.id,
+        type: 'credit',
+        category: 'Third Party',
+        amount: parseFloat(ticket.serviceAmount) || 0,
+        customerName: ticket.customerName,
+        productName: ticket.productName,
+        date: ticket.createdDate || ticket.createdAt || ticket.timestamp,
+        description: `Service amount collected - Ticket #${ticket.ticketNumber || ticket.id}`
+      },
+      {
+        id: ticket.id + '_commission',
+        ticketNumber: ticket.ticketNumber || ticket.id,
+        type: 'debit',
+        category: 'Third Party',
+        amount: parseFloat(ticket.commissionAmount) || 0,
+        customerName: ticket.customerName,
+        productName: ticket.productName,
+        date: ticket.createdDate || ticket.createdAt || ticket.timestamp,
+        description: `Commission owed to store - Ticket #${ticket.ticketNumber || ticket.id}`
+      }
+    ])
+  ].sort((a, b) => {
+    const dateA = a.date?.toDate?.() || new Date(a.date || 0);
+    const dateB = b.date?.toDate?.() || new Date(b.date || 0);
+    return dateB - dateA; // Most recent first
+  });
 
   // Filter tickets by date
   const filterTicketsByDate = (ticket) => {
@@ -269,7 +312,12 @@ const TechnicianPortal = () => {
       <div className="tech-portal-dashboard">
         <CustomerHistory
           technician={loggedInTech}
-          transactions={customerTransactions}
+          ticketTransactions={transactionHistory}
+          walletSummary={{
+            credits: thirdPartyServiceTotal + inStoreTotal,
+            debits: thirdPartyCommissionTotal,
+            balance: walletBalance
+          }}
           onClose={() => setShowHistory(false)}
         />
       </div>
@@ -312,12 +360,14 @@ const TechnicianPortal = () => {
             </span>
           </div>
           <div className="info-item">
-            <span className="info-label">Wallet Balance:</span>
-            <span className="wallet-balance">₹{customerBalance.toFixed(2)}</span>
+            <span className="info-label">Wallet:</span>
+            <span className="info-value" style={{ fontWeight: 700, color: walletBalance >= 0 ? '#16a34a' : '#dc2626', fontSize: '1.3rem' }}>
+              ₹{walletBalance.toFixed(2)}
+            </span>
           </div>
           <div className="info-item">
             <button className="btn-transactions" onClick={() => setShowHistory(true)}>
-              📜 View Transactions
+              📜 Transactions
             </button>
           </div>
         </div>

@@ -223,39 +223,76 @@ const Technicians = () => {
       })));
     }
 
-    // Calculate total amount from all tickets
-    // Wallet = In Store Service - In Store Commission - All Third Party Commissions
-    const inStoreTotal = techTickets.reduce((sum, ticket) => {
-      if (ticket.category === "In Store") {
-        const serviceAmount = parseFloat(ticket.serviceAmount) || 0;
-        const commissionAmount = parseFloat(ticket.commissionAmount) || 0;
-        // Add (Service - Commission) for In Store
-        return sum + (serviceAmount - commissionAmount);
-      }
-      return sum;
+    // Calculate wallet balance
+    // Third Party: CREDIT service amount (tech collects from customer), DEBIT commission (tech owes store)
+    // In Store: CREDIT commission amount (tech earns from store)
+    
+    const thirdPartyTickets = techTickets.filter(t => t.category === "Third Party");
+    const inStoreTickets = techTickets.filter(t => t.category === "In Store");
+    
+    // Third Party: Credit service amount
+    const thirdPartyServiceTotal = thirdPartyTickets.reduce((sum, ticket) => {
+      const serviceAmount = parseFloat(ticket.serviceAmount) || 0;
+      return sum + serviceAmount;
     }, 0);
 
-    const thirdPartyCommissions = techTickets.reduce((sum, ticket) => {
-      if (ticket.category === "Third Party") {
-        const commissionAmount = parseFloat(ticket.commissionAmount) || 0;
-        return sum + commissionAmount;
-      }
-      return sum;
+    // Third Party: Debit commission amount
+    const thirdPartyCommissionTotal = thirdPartyTickets.reduce((sum, ticket) => {
+      const commissionAmount = parseFloat(ticket.commissionAmount) || 0;
+      return sum + commissionAmount;
     }, 0);
 
-    // Final wallet = In Store Total - Third Party Commissions
-    const totalTicketAmount = inStoreTotal - thirdPartyCommissions;
+    // In Store: CREDIT (commission earned)
+    const inStoreTotal = inStoreTickets.reduce((sum, ticket) => {
+      const commissionAmount = parseFloat(ticket.commissionAmount) || 0;
+      return sum + commissionAmount;
+    }, 0);
 
-    // Calculate customer balance (total from tickets + credits - debits)
-    // If no tickets, balance should be 0 regardless of transactions
-    let customerBalance = 0;
-
-    if (techTickets.length > 0) {
-      const customerTrans = customerTransactions.filter(trans => trans.technicianId === selectedTech.id);
-      const credits = customerTrans.filter(t => t.type === 'credit').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
-      const debits = customerTrans.filter(t => t.type === 'debit').reduce((sum, t) => sum + parseFloat(t.amount || 0), 0);
-      customerBalance = totalTicketAmount + credits - debits;
-    }
+    // Wallet Balance = (Third Party Service + In Store Commission) - Third Party Commission
+    const walletBalance = thirdPartyServiceTotal + inStoreTotal - thirdPartyCommissionTotal;
+    
+    // Transaction history for display
+    const transactionHistory = [
+      ...inStoreTickets.map(ticket => ({
+        id: ticket.id + '_commission',
+        ticketNumber: ticket.ticketNumber || ticket.id,
+        type: 'credit',
+        category: 'In Store',
+        amount: parseFloat(ticket.commissionAmount) || 0,
+        customerName: ticket.customerName,
+        productName: ticket.productName,
+        date: ticket.createdDate || ticket.createdAt || ticket.timestamp,
+        description: `Commission earned - Ticket #${ticket.ticketNumber || ticket.id}`
+      })),
+      ...thirdPartyTickets.flatMap(ticket => [
+        {
+          id: ticket.id + '_service',
+          ticketNumber: ticket.ticketNumber || ticket.id,
+          type: 'credit',
+          category: 'Third Party',
+          amount: parseFloat(ticket.serviceAmount) || 0,
+          customerName: ticket.customerName,
+          productName: ticket.productName,
+          date: ticket.createdDate || ticket.createdAt || ticket.timestamp,
+          description: `Service amount collected - Ticket #${ticket.ticketNumber || ticket.id}`
+        },
+        {
+          id: ticket.id + '_commission',
+          ticketNumber: ticket.ticketNumber || ticket.id,
+          type: 'debit',
+          category: 'Third Party',
+          amount: parseFloat(ticket.commissionAmount) || 0,
+          customerName: ticket.customerName,
+          productName: ticket.productName,
+          date: ticket.createdDate || ticket.createdAt || ticket.timestamp,
+          description: `Commission owed to store - Ticket #${ticket.ticketNumber || ticket.id}`
+        }
+      ])
+    ].sort((a, b) => {
+      const dateA = a.date?.toDate?.() || new Date(a.date || 0);
+      const dateB = b.date?.toDate?.() || new Date(b.date || 0);
+      return dateB - dateA; // Most recent first
+    });
 
     // Filter tickets by date range
     const filterTicketsByDate = (ticket) => {
@@ -303,6 +340,23 @@ const Technicians = () => {
       return categoryMatch && statusMatch && dateMatch;
     });
 
+    if (showHistory) {
+      return (
+        <div className="service-center">
+          <CustomerHistory
+            technician={selectedTech}
+            ticketTransactions={transactionHistory}
+            walletSummary={{
+              credits: thirdPartyServiceTotal + inStoreTotal,
+              debits: thirdPartyCommissionTotal,
+              balance: walletBalance
+            }}
+            onClose={() => setShowHistory(false)}
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="service-center">
         <div className="service-header">
@@ -327,12 +381,12 @@ const Technicians = () => {
               </span>
             </div>
             <div className="tech-info-item">
-              <span className="tech-info-label">Wallet:</span>
-              <span className="tech-info-value" style={{ fontWeight: 700, color: '#16a34a', fontSize: '1.1rem' }}>
-                ₹{customerBalance.toFixed(2)}
+              <span className="tech-info-label">WALLET:</span>
+              <span className="tech-info-value" style={{ fontWeight: 700, color: walletBalance >= 0 ? '#16a34a' : '#dc2626', fontSize: '1.2rem' }}>
+                ₹{walletBalance.toFixed(2)}
               </span>
             </div>
-            <div className="tech-info-item" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <div className="tech-info-item">
               <button
                 className="btn-primary"
                 onClick={() => setShowHistory(true)}

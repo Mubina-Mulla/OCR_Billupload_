@@ -91,6 +91,7 @@ const AddTicket = ({
     category: "Demo",
     subOption: "",
     status: "Pending",
+    complaintType: "",
     serviceAmount: "",
     commissionAmount: "",
     amountReceived: "By Technician",
@@ -265,7 +266,8 @@ const AddTicket = ({
   const handleChange = (e) => {
     const { name, value } = e.target;
     if (name === "category") {
-      const isThirdPartyOrInStore = value === "Third Party" || value === "In Store";
+      const isThirdParty = value === "Third Party";
+      const isInStore = value === "In Store";
       const isDemoOrService = value === "Demo" || value === "Service";
       setFormData((prev) => ({
         ...prev,
@@ -273,7 +275,7 @@ const AddTicket = ({
         subOption: isDemoOrService ? "Navaratn Distributors - Navaratn Distributors sangli" : "",
         serviceAmount: "",
         commissionAmount: "",
-        amountReceived: isThirdPartyOrInStore ? "By Technician" : "",
+        amountReceived: isThirdParty ? "By Technician" : isInStore ? "By Store" : "",
       }));
     } else if (name === "subOption" && value) {
       // When technician is selected, populate default amounts
@@ -585,6 +587,33 @@ const AddTicket = ({
                   <option value="Service">Service</option>
                   <option value="Third Party">Third Party</option>
                   <option value="In Store">In Store</option>
+                </select>
+              </div>
+
+              {/* COMPLAINT TYPE */}
+              <div className="form-group">
+                <label>Complaint Type *</label>
+                <select 
+                  name="complaintType" 
+                  value={formData.complaintType} 
+                  onChange={handleChange}
+                  required
+                  style={{
+                    padding: '10px',
+                    borderRadius: '6px',
+                    border: '1px solid #d1d5db'
+                  }}
+                >
+                  <option value="">Select Complaint Type</option>
+                  <option value="Not Working">Not Working</option>
+                  <option value="Repair">Repair</option>
+                  <option value="Maintenance">Maintenance</option>
+                  <option value="Installation">Installation</option>
+                  <option value="Performance Issue">Performance Issue</option>
+                  <option value="Damage">Damage</option>
+                  <option value="Parts Replacement">Parts Replacement</option>
+                  <option value="Software Issue">Software Issue</option>
+                  <option value="Other">Other</option>
                 </select>
               </div>
 
