@@ -9,6 +9,19 @@ const CustomerHistory = ({ technician, ticketTransactions = [], walletSummary = 
     return dateB - dateA;
   });
 
+  // Calculate accurate service center wallet
+  // Service Center Wallet = 
+  //   Third Party: Commission received from tech
+  //   In Store: (Customer payment collected) - (Commission paid to tech)
+  // Total = Third Party Commission + In Store Service - In Store Commission
+  const serviceCenterAmount = (walletSummary.thirdPartyCommission || 0) + (walletSummary.inStoreService || 0) - (walletSummary.inStoreCommission || 0);
+
+  // Calculate payable amount (remaining amount tech owes to service center after settlements)
+  // When In Store tickets are resolved, commissions are used to settle Third Party debts
+  // Payable = Third Party Commission - In Store Commission (settled amount)
+  // If positive: Tech still owes, If negative: Tech has credit
+  const payableAmount = Math.max(0, (walletSummary.thirdPartyCommission || 0) - (walletSummary.inStoreCommission || 0));
+
   return (
     <div className="history-modal-overlay" onClick={onClose}>
       <div className="history-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -18,28 +31,47 @@ const CustomerHistory = ({ technician, ticketTransactions = [], walletSummary = 
         </div>
 
         <div className="history-modal-body">
-          {/* Wallet Summary */}
+          {/* Wallet Summary - Only Tech and Service Center Cards */}
           {walletSummary && Object.keys(walletSummary).length > 0 && (
             <div className="wallet-summary-section">
-              <h3>Wallet Summary</h3>
-              <div className="summary-cards">
-                <div className="summary-card credit-card">
-                  <span className="card-icon">💵</span>
-                  <span className="card-label">Total Credits (In Store)</span>
-                  <span className="card-amount">₹{walletSummary.credits?.toFixed(2) || '0.00'}</span>
+              <div className="wallet-details-cards">
+                <div className="wallet-detail-card tech-wallet">
+                  <span className="wallet-icon">👤</span>
+                  <div className="wallet-info">
+                    <span className="wallet-label">Technician Wallet</span>
+                    <span className="wallet-amount">₹{walletSummary.balance >= 0 ? walletSummary.balance.toFixed(2) : '0.00'}</span>
+                    <span className="wallet-description">
+                      {walletSummary.balance >= 0 ? 'Amount to receive from service center' : 'No pending amount'}
+                    </span>
+                  </div>
                 </div>
-                <div className="summary-card debit-card">
-                  <span className="card-icon">💸</span>
-                  <span className="card-label">Total Debits (Third Party)</span>
-                  <span className="card-amount">₹{walletSummary.debits?.toFixed(2) || '0.00'}</span>
+                <div className="wallet-detail-card service-wallet">
+                  <span className="wallet-icon">🏢</span>
+                  <div className="wallet-info">
+                    <span className="wallet-label">Service Center Wallet</span>
+                    <span className="wallet-amount">
+                      {serviceCenterAmount >= 0 
+                        ? `+₹${serviceCenterAmount.toFixed(2)}` 
+                        : `-₹${Math.abs(serviceCenterAmount).toFixed(2)}`}
+                    </span>
+                    <span className="wallet-description">
+                      {serviceCenterAmount >= 0 
+                        ? `Net balance after all transactions` 
+                        : `Net amount to pay technician`}
+                    </span>
+                  </div>
                 </div>
-                <div className={`summary-card balance-card ${walletSummary.balance >= 0 ? 'positive' : 'negative'}`}>
-                  <span className="card-icon">🏦</span>
-                  <span className="card-label">Net Balance</span>
-                  <span className="card-amount">₹{walletSummary.balance?.toFixed(2) || '0.00'}</span>
-                  <span className="card-status">
-                    {walletSummary.balance >= 0 ? 'You will receive' : 'You owe'}
-                  </span>
+                <div className="wallet-detail-card payable-wallet">
+                  <span className="wallet-icon">💰</span>
+                  <div className="wallet-info">
+                    <span className="wallet-label">Payable Amount</span>
+                    <span className="wallet-amount">₹{payableAmount.toFixed(2)}</span>
+                    <span className="wallet-description">
+                      {payableAmount > 0 
+                        ? 'Remaining commission after settlements' 
+                        : 'All commissions settled'}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -59,6 +91,8 @@ const CustomerHistory = ({ technician, ticketTransactions = [], walletSummary = 
                       <th>Category</th>
                       <th>Type</th>
                       <th>Amount</th>
+                      <th>Tech Gets</th>
+                      <th>Service Center</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -81,6 +115,16 @@ const CustomerHistory = ({ technician, ticketTransactions = [], walletSummary = 
                           </td>
                           <td className={`amount ${trans.type}`}>
                             {trans.type === 'credit' ? '+' : '-'}₹{trans.amount.toFixed(2)}
+                          </td>
+                          <td className={`tech-amount ${trans.netAmount >= 0 ? 'positive' : 'negative'}`}>
+                            {trans.category === 'In Store' 
+                              ? `+₹${trans.amount.toFixed(2)}` 
+                              : `+₹${trans.netAmount.toFixed(2)}`}
+                          </td>
+                          <td className={`service-amount ${trans.category === 'Third Party' && trans.type === 'debit' ? 'receives' : 'pays'}`}>
+                            {trans.category === 'In Store' 
+                              ? `-₹${trans.amount.toFixed(2)}` 
+                              : (trans.type === 'debit' ? `+₹${trans.amount.toFixed(2)}` : `-₹${trans.amount.toFixed(2)}`)}
                           </td>
                         </tr>
                       );

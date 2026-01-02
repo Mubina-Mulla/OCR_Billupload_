@@ -243,6 +243,12 @@ const TechnicianPortal = () => {
     return sum + commissionAmount;
   }, 0);
 
+  // In Store: Service amount (what company collects from customer)
+  const inStoreServiceTotal = inStoreTickets.reduce((sum, ticket) => {
+    const serviceAmount = parseFloat(ticket.serviceAmount) || 0;
+    return sum + serviceAmount;
+  }, 0);
+
   // Wallet Balance = (Third Party Service + In Store Commission) - Third Party Commission
   const walletBalance = thirdPartyServiceTotal + inStoreTotal - thirdPartyCommissionTotal;
   
@@ -254,35 +260,43 @@ const TechnicianPortal = () => {
       type: 'credit',
       category: 'In Store',
       amount: parseFloat(ticket.commissionAmount) || 0,
+      netAmount: parseFloat(ticket.commissionAmount) || 0,
       customerName: ticket.customerName,
       productName: ticket.productName,
       date: ticket.createdDate || ticket.createdAt || ticket.timestamp,
       description: `Commission earned - Ticket #${ticket.ticketNumber || ticket.id}`
     })),
-    ...thirdPartyTickets.flatMap(ticket => [
-      {
-        id: ticket.id + '_service',
-        ticketNumber: ticket.ticketNumber || ticket.id,
-        type: 'credit',
-        category: 'Third Party',
-        amount: parseFloat(ticket.serviceAmount) || 0,
-        customerName: ticket.customerName,
-        productName: ticket.productName,
-        date: ticket.createdDate || ticket.createdAt || ticket.timestamp,
-        description: `Service amount collected - Ticket #${ticket.ticketNumber || ticket.id}`
-      },
-      {
-        id: ticket.id + '_commission',
-        ticketNumber: ticket.ticketNumber || ticket.id,
-        type: 'debit',
-        category: 'Third Party',
-        amount: parseFloat(ticket.commissionAmount) || 0,
-        customerName: ticket.customerName,
-        productName: ticket.productName,
-        date: ticket.createdDate || ticket.createdAt || ticket.timestamp,
-        description: `Commission owed to store - Ticket #${ticket.ticketNumber || ticket.id}`
-      }
-    ])
+    ...thirdPartyTickets.flatMap(ticket => {
+      const serviceAmount = parseFloat(ticket.serviceAmount) || 0;
+      const commissionAmount = parseFloat(ticket.commissionAmount) || 0;
+      const netAmount = serviceAmount - commissionAmount;
+      return [
+        {
+          id: ticket.id + '_service',
+          ticketNumber: ticket.ticketNumber || ticket.id,
+          type: 'credit',
+          category: 'Third Party',
+          amount: serviceAmount,
+          netAmount: netAmount,
+          customerName: ticket.customerName,
+          productName: ticket.productName,
+          date: ticket.createdDate || ticket.createdAt || ticket.timestamp,
+          description: `Service amount collected - Ticket #${ticket.ticketNumber || ticket.id}`
+        },
+        {
+          id: ticket.id + '_commission',
+          ticketNumber: ticket.ticketNumber || ticket.id,
+          type: 'debit',
+          category: 'Third Party',
+          amount: commissionAmount,
+          netAmount: netAmount,
+          customerName: ticket.customerName,
+          productName: ticket.productName,
+          date: ticket.createdDate || ticket.createdAt || ticket.timestamp,
+          description: `Commission owed to store - Ticket #${ticket.ticketNumber || ticket.id}`
+        }
+      ];
+    })
   ].sort((a, b) => {
     const dateA = a.date?.toDate?.() || new Date(a.date || 0);
     const dateB = b.date?.toDate?.() || new Date(b.date || 0);
@@ -314,6 +328,10 @@ const TechnicianPortal = () => {
           technician={loggedInTech}
           ticketTransactions={transactionHistory}
           walletSummary={{
+            thirdPartyService: thirdPartyServiceTotal,
+            thirdPartyCommission: thirdPartyCommissionTotal,
+            inStoreService: inStoreServiceTotal,
+            inStoreCommission: inStoreTotal,
             credits: thirdPartyServiceTotal + inStoreTotal,
             debits: thirdPartyCommissionTotal,
             balance: walletBalance
