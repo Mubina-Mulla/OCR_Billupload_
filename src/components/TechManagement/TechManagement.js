@@ -226,9 +226,10 @@ const Technicians = () => {
     // Calculate wallet balance
     // Third Party: CREDIT service amount (tech collects from customer), DEBIT commission (tech owes store)
     // In Store: CREDIT commission amount (tech earns from store)
+    // Only include RESOLVED tickets in wallet calculation
     
-    const thirdPartyTickets = techTickets.filter(t => t.category === "Third Party");
-    const inStoreTickets = techTickets.filter(t => t.category === "In Store");
+    const thirdPartyTickets = techTickets.filter(t => t.category === "Third Party" && t.status === "Resolved");
+    const inStoreTickets = techTickets.filter(t => t.category === "In Store" && t.status === "Resolved");
     
     // Third Party: Credit service amount
     const thirdPartyServiceTotal = thirdPartyTickets.reduce((sum, ticket) => {
