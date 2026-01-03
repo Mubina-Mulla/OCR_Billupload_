@@ -1267,14 +1267,18 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                                 year: 'numeric'
                               })}
                             </div>
-                            {ticket.status === 'Resolved' && (ticket.resolvedAt || ticket.resolvedDate) && (
+                            {ticket.status === 'Resolved' && (
                               <div style={{ color: '#10b981', fontWeight: '600' }}>
                                 <small style={{ color: '#059669', fontSize: '0.75rem' }}>Resolved: </small>
-                                {new Date(ticket.resolvedAt || ticket.resolvedDate).toLocaleDateString('en-GB', {
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric'
-                                })}
+                                {(ticket.resolvedAt || ticket.resolvedDate) ? (
+                                  new Date(ticket.resolvedAt || ticket.resolvedDate).toLocaleDateString('en-GB', {
+                                    day: '2-digit',
+                                    month: '2-digit',
+                                    year: 'numeric'
+                                  })
+                                ) : (
+                                  <span style={{ fontSize: '0.75rem', fontStyle: 'italic' }}>Date not recorded</span>
+                                )}
                               </div>
                             )}
                           </div>
@@ -1501,15 +1505,19 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                         })}
                       </span>
                     </div>
-                    {ticket.status === 'Resolved' && (ticket.resolvedAt || ticket.resolvedDate) && (
+                    {ticket.status === 'Resolved' && (
                       <div className="mobile-info-row">
                         <span className="mobile-info-label">Resolved</span>
                         <span className="mobile-info-value" style={{ color: '#10b981', fontWeight: '600' }}>
-                          {new Date(ticket.resolvedAt || ticket.resolvedDate).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric'
-                          })}
+                          {(ticket.resolvedAt || ticket.resolvedDate) ? (
+                            new Date(ticket.resolvedAt || ticket.resolvedDate).toLocaleDateString('en-GB', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric'
+                            })
+                          ) : (
+                            <span style={{ fontSize: '0.75rem', fontStyle: 'italic' }}>Date not recorded</span>
+                          )}
                         </span>
                       </div>
                     )}

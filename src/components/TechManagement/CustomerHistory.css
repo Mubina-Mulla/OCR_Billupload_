@@ -28,6 +28,7 @@
   align-items: center;
   padding: 20px 24px;
   border-bottom: 1px solid #e5e7eb;
+  position: -webkit-sticky;
   position: sticky;
   top: 0;
   background: white;
