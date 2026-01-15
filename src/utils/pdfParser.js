@@ -479,65 +479,84 @@ function parseCustomerDetails(text) {
   // Special handling for buyer/recipient section - "Take below 2 lines" strategy
   // Added common OCR typos: BuyerRacpiant, BuycrRecipicnt
   // Removed 'recipient' to avoid matching "TAX INVOICE (ORIGINAL FOR RECIPIENT)"
-  const buyerKeywords = ['buyer/recipient', 'billed to', 'bill to', 'buyerracpiant', 'buycr', 'buyer\n'];
+  const buyerKeywords = ['buyer/recipient', 'billed to', 'bill to', 'buyerracpiant', 'buycr', 'buyer\n', 'recipient'];
   const lines = text.split('\n').map(l => l.trim());
+  
+  let buyerSectionStart = -1;
+  let buyerSectionEnd = -1;
 
   for (let i = 0; i < lines.length; i++) {
     const lineLower = lines[i].toLowerCase();
 
     // Check if line contains buyer keyword
-    if (buyerKeywords.some(kw => lineLower.includes(kw))) {
-      console.log('Found Buyer Header at line:', lines[i]);
+    if (buyerKeywords.some(kw => lineLower.includes(kw)) && buyerSectionStart === -1) {
+      buyerSectionStart = i;
+      console.log('✅ Found Buyer Section Start at line:', lines[i]);
 
       // Line + 1: Name
       if (i + 1 < lines.length && !customer.name) {
         const nameLine = lines[i + 1];
-        if (nameLine.length > 2 && !/phone|mobile|gst|state/i.test(nameLine)) {
+        if (nameLine.length > 2 && !/phone|mobile|gst|state|contact.*service|contact.*sales/i.test(nameLine)) {
           customer.name = nameLine;
-          console.log('Extracted Name from Line+1:', customer.name);
+          console.log('✅ Extracted Name from Line+1:', customer.name);
         }
       }
 
-      // Line + 2: Address and Mobile Number
+      // Line + 2: Address (without extracting phone from here initially)
       if (i + 2 < lines.length && !customer.address) {
         let addrLine = lines[i + 2];
-        if (addrLine.length > 5 && !/mobile|gst|state/i.test(addrLine)) { // Removed 'phone' from exclusion to allow parsing
-
-          // Check for embedded phone in address line (e.g., "Address... 8149424106")
-          const phoneMatch = addrLine.match(/(\d{10})/);
-          if (phoneMatch) {
-            customer.phone = phoneMatch[1];
-            // Remove phone from address
-            customer.address = addrLine.replace(phoneMatch[1], '').replace(/,$/, '').trim();
-            console.log('Extracted Phone from Address line:', customer.phone);
-            console.log('Extracted Address (cleaned):', customer.address);
-          } else {
-            customer.address = addrLine;
-            console.log('Extracted Address from Line+2:', customer.address);
-          }
+        if (addrLine.length > 5 && !/mobile|gst|state/i.test(addrLine)) {
+          // Just extract address, we'll get phone from labeled "Mobile No." below
+          customer.address = addrLine.replace(/[\d\s,]+$/, '').trim(); // Remove trailing numbers
+          console.log('✅ Extracted Address from Line+2:', customer.address);
         }
       }
-      break;
+      continue;
+    }
+    
+    // Find end of buyer section (when product table starts)
+    if (buyerSectionStart !== -1 && buyerSectionEnd === -1) {
+      if (/sr\.|item|description|product|company.*name/i.test(lineLower)) {
+        buyerSectionEnd = i;
+        console.log('✅ Found Buyer Section End at line:', lines[i]);
+        break;
+      }
     }
   }
 
-  // Extract labeled "Mobile No." as WhatsApp if we already have a primary phone (from address)
-  // or if we use it as primary phone if we don't have one.
-  const mobileLabelMatch = text.match(/(?:mobile|mob)\s*(?:no\.?)?\s*[:\-]?\s*(\d{10})/i);
-  if (mobileLabelMatch) {
-    const mobileNo = mobileLabelMatch[1];
-    if (customer.phone && customer.phone !== mobileNo) {
-      customer.whatsapp = mobileNo;
-      console.log('Extracted labeled Mobile No. as WhatsApp:', customer.whatsapp);
-    } else if (!customer.phone) {
-      customer.phone = mobileNo;
-      console.log('Extracted labeled Mobile No. as Phone:', customer.phone);
+  // ✅ FIXED: Extract phone ONLY from buyer/recipient section (not from owner's contact info)
+  // Only search within the buyer section lines
+  if (buyerSectionStart !== -1) {
+    const buyerEndIndex = buyerSectionEnd !== -1 ? buyerSectionEnd : lines.length;
+    const buyerLines = lines.slice(buyerSectionStart, buyerEndIndex);
+    const buyerText = buyerLines.join('\n');
+    
+    console.log('🔍 Searching for customer phone ONLY in buyer section...');
+    console.log('📋 Buyer section text:', buyerText);
+    
+    // Look for labeled "Mobile No." or "Phone:" in buyer section
+    const mobileLabelMatch = buyerText.match(/(?:mobile|mob)\s*(?:no\.?)?\s*[:\-]?\s*(\d{10})/i);
+    const phoneLabelMatch = buyerText.match(/(?:phone|ph)\s*(?:no\.?)?\s*[:\-]?\s*(\d{10})/i);
+    
+    if (mobileLabelMatch) {
+      customer.phone = mobileLabelMatch[1];
+      customer.whatsapp = mobileLabelMatch[1];
+      console.log('✅ Extracted customer mobile from buyer section:', customer.phone);
+    } else if (phoneLabelMatch) {
+      customer.phone = phoneLabelMatch[1];
+      customer.whatsapp = phoneLabelMatch[1];
+      console.log('✅ Extracted customer phone from buyer section:', customer.phone);
+    } else {
+      // Fallback: look for standalone 10-digit number in buyer section
+      const standaloneMatch = buyerText.match(/\b([6-9]\d{9})\b/);
+      if (standaloneMatch) {
+        customer.phone = standaloneMatch[1];
+        customer.whatsapp = standaloneMatch[1];
+        console.log('✅ Extracted customer phone (standalone) from buyer section:', customer.phone);
+      }
     }
-  }
-
-  // Set WhatsApp to phone if not found separately (fallback)
-  if (!customer.whatsapp && customer.phone) {
-    customer.whatsapp = customer.phone;
+  } else {
+    console.warn('⚠️ Buyer section not found in bill text');
   }
 
   // Clean up phone numbers

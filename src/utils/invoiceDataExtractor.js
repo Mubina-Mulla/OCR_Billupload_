@@ -118,7 +118,8 @@ class InvoiceDataExtractor {
       
       // Detect customer section start
       if (line.includes('buyer') || line.includes('customer') || 
-          line.includes('bill to') || line.includes('sold to')) {
+          line.includes('bill to') || line.includes('sold to') ||
+          line.includes('recipient')) {
         inCustomerSection = true;
         continue;
       }
@@ -151,13 +152,37 @@ class InvoiceDataExtractor {
     }
     customer.address = addressLines.join(', ');
 
-    // Extract phone numbers
-    const phoneMatches = customerLines.join(' ').match(this.patterns.phone);
-    if (phoneMatches && phoneMatches.length > 0) {
-      customer.phone = phoneMatches[0];
-      if (phoneMatches.length > 1) {
-        customer.mobile = phoneMatches[1];
+    // ✅ FIXED: Extract phone numbers ONLY from buyer/recipient section
+    // Avoid extracting owner's service/sales numbers that appear BEFORE buyer section
+    // Only look for patterns like "Mobile No." or "Phone:" within customerLines
+    for (const line of customerLines) {
+      // Look for labeled mobile/phone numbers in buyer section only
+      const mobileMatch = line.match(/(?:mobile|mob)\s*(?:no\.?)?\s*[:\-]?\s*(\d{10})/i);
+      const phoneMatch = line.match(/(?:phone|ph)\s*(?:no\.?)?\s*[:\-]?\s*(\d{10})/i);
+      
+      if (mobileMatch && !customer.mobile) {
+        customer.mobile = mobileMatch[1];
+        console.log('✅ Extracted customer mobile from buyer section:', customer.mobile);
       }
+      
+      if (phoneMatch && !customer.phone) {
+        customer.phone = phoneMatch[1];
+        console.log('✅ Extracted customer phone from buyer section:', customer.phone);
+      }
+      
+      // If we find a standalone 10-digit number (without label) use it as fallback
+      if (!customer.phone && !customer.mobile) {
+        const standaloneMatch = line.match(/\b([6-9]\d{9})\b/);
+        if (standaloneMatch) {
+          customer.phone = standaloneMatch[1];
+          console.log('✅ Extracted customer phone (standalone):', customer.phone);
+        }
+      }
+    }
+    
+    // Set mobile to phone if only one was found
+    if (!customer.mobile && customer.phone) {
+      customer.mobile = customer.phone;
     }
 
     // Extract GSTIN
