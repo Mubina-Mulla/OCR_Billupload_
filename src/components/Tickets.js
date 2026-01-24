@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { updateDoc, getDocs, collection, doc } from "firebase/firestore";
-import { db, getDocRef, getAdminTicketDocRef, getAdminTicketsCollectionRef, getCollectionRef } from "../firebase/config";
+import { db, getAdminTicketDocRef, getAdminTicketsCollectionRef, getCollectionRef } from "../firebase/config";
 import ConfirmDialog from './ConfirmDialog';
 import Notification from './Notification';
 import useNotification from '../hooks/useNotification';
@@ -37,13 +37,17 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
   const [ticketEditValues, setTicketEditValues] = useState({}); // Store ticket field values being edited
   const [showExportMenu, setShowExportMenu] = useState(false); // Track export menu visibility
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false); // Track Add Customer modal visibility
+  // eslint-disable-next-line no-unused-vars
   const [allCategories, setAllCategories] = useState([]);
+  // eslint-disable-next-line no-unused-vars
   const [editingTicket, setEditingTicket] = useState(null);
+  // eslint-disable-next-line no-unused-vars
   const [technicians, setTechnicians] = useState([]);
 
 
 
   // Get current user ID for user-specific tickets
+  // eslint-disable-next-line no-unused-vars
   const getCurrentUserId = () => {
     try {
       const currentAdmin = localStorage.getItem('currentAdmin');
@@ -77,6 +81,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const getCurrentUserName = () => {
     try {
       const currentAdmin = localStorage.getItem('currentAdmin');
@@ -572,6 +577,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
   };
 
   // Handle full ticket editing
+  // eslint-disable-next-line no-unused-vars
   const handleEditTicket = (ticket) => {
     setEditingTicket(prev => ({ ...prev, [ticket.id]: true }));
     setTicketEditValues(prev => ({
@@ -589,12 +595,13 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       }
     }));
   };
-
+  // eslint-disable-next-line no-unused-vars
   const handleCancelEditTicket = (ticketId) => {
     setEditingTicket(prev => ({ ...prev, [ticketId]: false }));
     setTicketEditValues(prev => ({ ...prev, [ticketId]: {} }));
   };
 
+  // eslint-disable-next-line no-unused-vars
   const handleSaveTicket = async (ticketId, ticket) => {
     try {
       // Check authorization
@@ -658,6 +665,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
 // End of commented out updateTicketStatus
   
   // ✅ Updated Priority Colors: High=Red, Medium=Yellow, Low=Green
+  // eslint-disable-next-line no-unused-vars
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
       case "high": return "#dc2626";   // Red for High
@@ -676,7 +684,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       default: return "#6b7280";
     }
   };
-
+  // eslint-disable-next-line no-unused-vars
   const getStatusIcon = (status) => {
     switch (status) {
       case "Pending": return "⏳";

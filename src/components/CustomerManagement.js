@@ -13,7 +13,7 @@ import './CustomerManagement.css';
 const CustomerManagement = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const params = useParams();
+  // const params = useParams(); // Unused
 
   const [customers, setCustomers] = useState([]);
   const [products, setProducts] = useState([]);
@@ -310,14 +310,14 @@ const CustomerManagement = () => {
   };
 
   // Helper functions for ticket display
-  const getPriorityColor = (priority) => {
+  /* const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
       case "high": return "#dc2626";
       case "medium": return "#ea580c";
       case "low": return "#16a34a";
       default: return "#6b7280";
     }
-  };
+  }; */
 
   const getStatusColor = (status) => {
     switch (status) {

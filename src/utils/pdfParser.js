@@ -2586,16 +2586,16 @@ function parseSimpleProductLine(line) {
     // Pattern 1: Tab-separated format from OCR logs - "1\tWhirlpool\t001\t17900.00\t15169.49"
     /^(\d+)\s*\t\s*([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/,
     // Pattern 2: Mixed tab/space format - "2 Apple\t1\tTV\t149999.97\t299999.94"
-    /^(\d+)\s+([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([A-Za-z][A-Za-z0-9\s\-]*?)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/,
+    /^(\d+)\s+([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([A-Za-z][A-Za-z0-9\s-]*?)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/,
     // Pattern 3: Full format with quantity - "1 Xiaomi 0014 NOTE 17 pro 2 90000.00 180000.00"
-    /^(\d+)\s+([A-Za-z]+)\s+(\d+)\s+([A-Za-z][A-Za-z0-9\s\-\.]*?)\s+(\d+)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/i,
+    /^(\d+)\s+([A-Za-z]+)\s+(\d+)\s+([A-Za-z][A-Za-z0-9\s-.]*?)\s+(\d+)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/i,
     // Pattern 4: Space-separated with known brands (with quantity)
-    /^(\d+)\s+(Apple|Samsung|LG|Sony|HP|Dell|Lenovo|Mi|Realme|OnePlus|Vivo|Oppo|Redmi|Bajaj|Whirlpool|Xiaomi|Zebronics)\s+(\d+)\s+(MacBook|iPhone|Galaxy|TV|Laptop|Mobile|Phone|Tablet|Watch|AirPods|NOTE|HT|Samba|[A-Za-z][A-Za-z0-9\s\-\.]*?)\s+(\d+)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/i,
+    /^(\d+)\s+(Apple|Samsung|LG|Sony|HP|Dell|Lenovo|Mi|Realme|OnePlus|Vivo|Oppo|Redmi|Bajaj|Whirlpool|Xiaomi|Zebronics)\s+(\d+)\s+(MacBook|iPhone|Galaxy|TV|Laptop|Mobile|Phone|Tablet|Watch|AirPods|NOTE|HT|Samba|[A-Za-z][A-Za-z0-9\s-.]*?)\s+(\d+)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/i,
     // Pattern 5: Navaratna Image Format: Sr | Name(Comp+Prod) | HSN | GST | Serial | Qty | Rate | Amount
     // Example: "1 Zebronics HT Samba 4.1 851822 18% 0385 1 No. 6,800.00 5,762.71"
-    /^(\d+)\s+(.+?)\s+(\d{4,8})\s+(\d+%?)\s+([A-Za-z0-9\(\)\-]+)\s+(\d+\s*(?:No\.?|Nos\.?|Pcs\.?)?)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/i,
+    /^(\d+)\s+(.+?)\s+(\d{4,8})\s+(\d+%?)\s+([A-Za-z0-9()-]+)\s+(\d+\s*(?:No\.?|Nos\.?|Pcs\.?)?)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/i,
     // Pattern 6: More flexible space-separated
-    /^(\d+)\s+([A-Za-z][A-Za-z\s&]*?)\s+(\d+)\s+([A-Za-z][A-Za-z0-9\s\-\.]*?)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/i
+    /^(\d+)\s+([A-Za-z][A-Za-z\s&]*?)\s+(\d+)\s+([A-Za-z][A-Za-z0-9\s-.]*?)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/i
   ];
 
   // Try each pattern
@@ -2710,7 +2710,7 @@ function parseSimpleProductLine(line) {
 
   // Fallback patterns for other invoice formats
   // Pattern 1: "1 LG TV PID0033 N/A 2106090 2 18% 3000.00 6000.00"
-  const pattern1 = /^(\d+)\s+([a-z]+)\s+([a-z0-9\s]+?)\s+([a-z0-9\/]+)\s+([a-z0-9\/]+)\s+(\d+)\s+(\d+%?)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/i;
+  const pattern1 = /^(\d+)\s+([a-z]+)\s+([a-z0-9\s]+?)\s+([a-z0-9/]+)\s+([a-z0-9/]+)\s+(\d+)\s+(\d+%?)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/i;
 
   // Pattern 2: "1 Whirlpool Ref DC 215 Impro Prm 5s Cool Illusi-72590 84182100 18% 1 1 No. 17,900.00 15,169.49"
   const pattern2 = /^(\d+)\s+([a-z]+)\s+(.+?)\s+(\d{6,8})\s+(\d+%)\s+(\d+)\s+(\d+)\s+No\.\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/i;
