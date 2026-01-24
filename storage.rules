@@ -1,0 +1,28 @@
+rules_version = '2';
+
+// Firebase Storage Security Rules for Bill Upload Application
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Allow uploads to /images folder
+    match /images/{imageId} {
+      // Allow authenticated users to read images
+      allow read: if request.auth != null;
+      
+      // Allow authenticated users to upload jpg/png images (max 10MB)
+      allow write: if request.auth != null
+                   && request.resource.size < 10 * 1024 * 1024  // Max 10MB
+                   && (request.resource.contentType.matches('image/jpeg') 
+                       || request.resource.contentType.matches('image/jpg')
+                       || request.resource.contentType.matches('image/png'));
+      
+      // Allow authenticated users to delete images
+      allow delete: if request.auth != null;
+    }
+    
+    // Deny all other paths by default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -9,7 +9,6 @@ const Dashboard = () => {
   const [showTickets, setShowTickets] = useState(true); // Show tickets by default
   const [showInStockForm, setShowInStockForm] = useState(false);
   const [inStockStatusFilter, setInStockStatusFilter] = useState('active'); // Status filter for In Stock
-  const excludeResolved = true; // Dashboard should not show resolved tickets
 
   const sections = [
     { name: "demo", label: "Demo" },
@@ -92,42 +91,22 @@ const Dashboard = () => {
                 {filterCategory ? sections.find(s => s.name === filterCategory)?.label + ' Tickets' : 'All Tickets'}
               </h2>
               <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                {filterCategory === 'in stock' && (
-                  <button
-                    className="btn-primary"
-                    onClick={() => {
-                      setShowInStockForm(true);
-                      setShowTickets(false);
-                    }}
-                    style={{
-                      padding: "8px 16px",
-                      fontSize: "0.95rem",
-                      whiteSpace: "nowrap",
-                      borderRadius: "6px",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "6px",
-                      fontWeight: "500",
-                      width: "auto",
-                      minWidth: "fit-content",
-                      maxWidth: "220px"
-                    }}
-                  >
-                    <span style={{ fontSize: "1.1rem", fontWeight: "400" }}>+</span>
-                    Add Defective Product
-                  </button>
-                )}
+                {/* Add Defective Product button moved to Tickets.js */}
               </div>
             </div>
             <Tickets
               key="tickets-main"
               filterCategory={filterCategory}
-              excludeResolved={filterCategory === 'in stock' ? false : excludeResolved}
-              showStatusFilter={false}
+              excludeResolved={false}
+              showStatusFilter={filterCategory !== 'in stock'}
               showEditableNotes={true}
               inStockStatusFilter={filterCategory === 'in stock' ? inStockStatusFilter : null}
               setInStockStatusFilter={setInStockStatusFilter}
-              showAddCustomerAction={true}
+              showAddCustomerAction={filterCategory !== 'in stock'}
+              onAddDefectiveProduct={() => {
+                setShowInStockForm(true);
+                setShowTickets(false);
+              }}
             />
           </>
         )}

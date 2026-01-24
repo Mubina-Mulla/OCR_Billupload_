@@ -19,7 +19,7 @@ let cachedTickets = [];
 let lastLoadTime = 0;
 const CACHE_DURATION = 30000; // 30 seconds
 
-const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = true, showEditableNotes = false, inStockStatusFilter = null, setInStockStatusFilter, showAddCustomerAction = false }) => {
+const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = true, showEditableNotes = false, inStockStatusFilter = null, setInStockStatusFilter, showAddCustomerAction = false, onAddDefectiveProduct }) => {
   const [allTickets, setAllTickets] = useState(cachedTickets); // Start with cached tickets
   const [displayedTickets, setDisplayedTickets] = useState([]); // Only tickets to show (9 at a time)
   const [currentBatch, setCurrentBatch] = useState(0); // Current batch number (0, 1, 2...)
@@ -949,18 +949,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
         <div className="header-main">
           <h1>Ticket Management</h1>
           <div className="header-controls">
-            <div className="tickets-count">
-              Showing {filteredTickets.length} of {totalFilteredCount} {totalFilteredCount === 1 ? 'ticket' : 'tickets'}
-              {filterCategory && ` in "${getCategoryDisplayName(filterCategory)}"`}
-              {(startDate || endDate) && (
-                <span>
-                  {startDate && endDate ? ` from ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}` :
-                    startDate ? ` from ${new Date(startDate).toLocaleDateString()}` :
-                      ` until ${new Date(endDate).toLocaleDateString()}`}
-                </span>
-              )}
-            </div>
-
+            
             <div className="filter-section">
 
               {inStockStatusFilter !== null && setInStockStatusFilter && (
@@ -1138,6 +1127,36 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
                   </>
                 )}
               </div>
+
+              {/* Add Defective Product Button */}
+              {filterCategory === 'in stock' && onAddDefectiveProduct && (
+                <button
+                  className="btn-primary"
+                  onClick={onAddDefectiveProduct}
+                  style={{
+                    padding: "4px 8px",
+                    fontSize: "0.75rem",
+                    whiteSpace: "nowrap",
+                    borderRadius: "4px",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "3px",
+                    fontWeight: "500",
+                    width: "fit-content",
+                    minWidth: "auto",
+                    marginLeft: '8px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+                    color: 'white',
+                    cursor: 'pointer',
+                    boxShadow: '0 1px 2px rgba(59, 130, 246, 0.3)',
+                    height: '28px'
+                  }}
+                >
+                  <span style={{ fontSize: "0.9rem", fontWeight: "400" }}>+</span>
+                  Add Defective Product
+                </button>
+              )}
 
               {/* Add Customer Button (Conditional for Dashboard) */}
               {showAddCustomerAction && (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { addDoc, onSnapshot, updateDoc, deleteDoc } from 'firebase/firestore';
-import { getCollectionRef, getDocRef } from '../firebase/config';
+import { getCollectionRef, getDocRef, uploadBillImage } from '../firebase/config';
 import AddProduct from './AddProduct';
 import AddTicket from './AddTicket';
 import BillGenerator from './BillGenerator';
@@ -32,6 +32,7 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
   const [tempProducts, setTempProducts] = useState([]);
   const [isUploadingBill, setIsUploadingBill] = useState(false);
   const [hasAutoFilledData, setHasAutoFilledData] = useState(false);
+  const [billImageUrl, setBillImageUrl] = useState(''); // Store uploaded bill image URL
   const { notification, showNotification, hideNotification } = useNotification();
 
   // Clear form data on component mount to ensure fresh start
@@ -50,8 +51,9 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
       joinDate: ''
     });
 
-    // Reset temp products
+    // Reset temp products and bill image
     setTempProducts([]);
+    setBillImageUrl('');
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
@@ -75,14 +77,33 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
     const file = event.target.files?.[0];
     if (!file) return;
 
-    console.log('🟡 Processing uploaded bill:', file.name);
+    console.log('🟡 Processing uploaded bill:', file.name, 'Type:', file.type);
     setIsUploadingBill(true);
     setHasAutoFilledData(false);
-    showNotification('Scanning bill... Please wait', 'info');
 
     try {
+      // REMOVED: Image storage upload - images are NOT saved to Firebase Storage
+      // We only perform OCR extraction without storing the image
+      
+      console.log('📄 Scanning and extracting data from bill...');
+      showNotification('🔍 Extracting data from bill...', 'info');
+      
       const extractedData = await parsePdfToData(file);
-      console.log('🔵 PDF parser result:', extractedData);
+      console.log('🔵 OCR extraction result:', extractedData);
+
+      // LOG EXTRACTION SUMMARY
+      console.log('═══════════════════════════════════════');
+      console.log('📊 EXTRACTION SUMMARY:');
+      console.log('  Customer Name:', extractedData.customer?.name || '❌ NOT FOUND');
+      console.log('  Phone:', extractedData.customer?.phone || '❌ NOT FOUND');
+      console.log('  Address:', extractedData.customer?.address || '❌ NOT FOUND');
+      console.log('  Products Found:', extractedData.products?.length || 0);
+      if (extractedData.products?.length > 0) {
+        extractedData.products.forEach((p, i) => {
+          console.log(`    ${i + 1}. ${p.companyName} ${p.name} - Qty:${p.qty} ₹${p.price}`);
+        });
+      }
+      console.log('═══════════════════════════════════════');
 
       if (extractedData && extractedData.customer) {
         console.log('🟢 Customer data extracted:', extractedData.customer);
@@ -94,6 +115,9 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
           setHasAutoFilledData(true);
         }
 
+        // STEP 3: Fill form fields with extracted data
+        console.log('📝 STEP 3: Auto-filling form with extracted data...');
+        
         // Update customer form with extracted data
         setFormData(prev => ({
           ...prev,
@@ -112,7 +136,7 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
         if (extractedData.customer.contactPerson) extractedFields.push('Contact Person');
 
         if (extractedFields.length > 0) {
-          showNotification(`✅ Customer form auto-filled: ${extractedFields.join(', ')}`, 'success');
+          showNotification(`✅ Form auto-filled: ${extractedFields.join(', ')}`, 'success');
         }
 
         if (extractedData.products && extractedData.products.length > 0) {
@@ -160,15 +184,17 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
 
         // Show summary of what was extracted
         const summary = [];
-        if (extractedFields.length > 0) summary.push(`${extractedFields.length} customer field(s)`);
+        // REMOVED: Image storage reference
+        if (extractedFields.length > 0) summary.push(`${extractedFields.length} field(s) filled`);
         if (extractedData.products?.length > 0) summary.push(`${extractedData.products.length} product(s)`);
 
         if (summary.length > 0) {
-          showNotification(`📄 Bill processed: ${summary.join(', ')}`, 'success');
+          console.log('✅ Process complete: OCR → Form auto-fill');
+          showNotification(`✅ Complete! ${summary.join(' • ')}`, 'success');
         }
       } else {
-        console.log('🔴 No data extracted from PDF');
-        showNotification('Could not extract data from PDF. Please fill manually.', 'warning');
+        console.log('🔴 No data extracted from bill');
+        showNotification('Could not extract data. Please fill manually.', 'warning');
       }
 
     } catch (error) {
@@ -216,10 +242,13 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
 
     setIsSubmitting(true);
     try {
+      // REMOVED: Bill image storage - images are not saved to Firebase Storage
+      
       const customerData = {
         ...formData,
         joinDate: new Date().toISOString(),
         productCount: tempProducts.length
+        // REMOVED: billImageUrl field
       };
 
       const customersRef = getCollectionRef('customers');
@@ -322,6 +351,7 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
       joinDate: ''
     });
     setTempProducts([]);
+    setBillImageUrl(''); // Clear bill image URL
     // Clear all localStorage data
     localStorage.removeItem('tempProducts');
     localStorage.removeItem('customerFormData');

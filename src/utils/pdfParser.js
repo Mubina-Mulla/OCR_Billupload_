@@ -444,14 +444,8 @@ function parseCustomerDetails(text) {
       /M\/S[:\s]+([^\n]+)/i,
       /Name[:\s]+([^\n]+)/i
     ],
-    phone: [
-      /Phone[:\s]+(\d{10})/i, // Same line
-      /Mobile[:\s]+(\d{10})/i, // Same line
-      /Phone:\s*(\d{10})/i,
-      /Mobile\s*No[:\s]*(\d{10})/i,
-      /\b([6-9]\d{9})\b/,
-      /(\d{10})/g
-    ],
+    // ❌ REMOVED: Phone patterns here - we extract phone ONLY from buyer section with blacklist check below
+    // phone: [ ... patterns removed ... ],
     contactPerson: [
       /Contact\s*Person[:\s]+([^\n]+)/i, // Same line
       /Contact\s*Person:\s*([A-Za-z\s]+)/i,
@@ -481,6 +475,9 @@ function parseCustomerDetails(text) {
   // Removed 'recipient' to avoid matching "TAX INVOICE (ORIGINAL FOR RECIPIENT)"
   const buyerKeywords = ['buyer/recipient', 'billed to', 'bill to', 'buyerracpiant', 'buycr', 'buyer\n', 'recipient'];
   const lines = text.split('\n').map(l => l.trim());
+  
+  console.log('🔍 DEBUG: Total lines in document:', lines.length);
+  console.log('🔍 DEBUG: First 20 lines:', lines.slice(0, 20));
   
   let buyerSectionStart = -1;
   let buyerSectionEnd = -1;
@@ -529,34 +526,163 @@ function parseCustomerDetails(text) {
   if (buyerSectionStart !== -1) {
     const buyerEndIndex = buyerSectionEnd !== -1 ? buyerSectionEnd : lines.length;
     const buyerLines = lines.slice(buyerSectionStart, buyerEndIndex);
-    const buyerText = buyerLines.join('\n');
     
+    console.log('✅ Buyer section found! Start:', buyerSectionStart, 'End:', buyerEndIndex);
     console.log('🔍 Searching for customer phone ONLY in buyer section...');
-    console.log('📋 Buyer section text:', buyerText);
+    console.log('📋 Buyer section lines:', buyerLines);
     
-    // Look for labeled "Mobile No." or "Phone:" in buyer section
-    const mobileLabelMatch = buyerText.match(/(?:mobile|mob)\s*(?:no\.?)?\s*[:\-]?\s*(\d{10})/i);
-    const phoneLabelMatch = buyerText.match(/(?:phone|ph)\s*(?:no\.?)?\s*[:\-]?\s*(\d{10})/i);
-    
-    if (mobileLabelMatch) {
-      customer.phone = mobileLabelMatch[1];
-      customer.whatsapp = mobileLabelMatch[1];
-      console.log('✅ Extracted customer mobile from buyer section:', customer.phone);
-    } else if (phoneLabelMatch) {
-      customer.phone = phoneLabelMatch[1];
-      customer.whatsapp = phoneLabelMatch[1];
-      console.log('✅ Extracted customer phone from buyer section:', customer.phone);
-    } else {
-      // Fallback: look for standalone 10-digit number in buyer section
-      const standaloneMatch = buyerText.match(/\b([6-9]\d{9})\b/);
-      if (standaloneMatch) {
-        customer.phone = standaloneMatch[1];
-        customer.whatsapp = standaloneMatch[1];
-        console.log('✅ Extracted customer phone (standalone) from buyer section:', customer.phone);
+    // STEP 1: Build a blacklist of ALL phone numbers that appear with service/sales/contact keywords
+    const blacklistedNumbers = new Set();
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lower = line.toLowerCase();
+      
+      // If line contains service/sales/contact/salesman keywords, extract and blacklist ALL numbers in that line
+      // Also blacklist if it appears BEFORE the buyer section
+      if (lower.includes('service') || 
+          lower.includes('sales') || 
+          lower.includes('contact') ||
+          lower.includes('salesman') ||
+          lower.includes('user name') ||
+          i < buyerSectionStart) {  // Blacklist all numbers before buyer section
+        const numbersInLine = line.match(/\b\d{10}\b/g);
+        if (numbersInLine) {
+          numbersInLine.forEach(num => {
+            blacklistedNumbers.add(num);
+            console.log('🚫 Blacklisted number (service/before buyer):', num, 'from line:', line.substring(0, 50));
+          });
+        }
       }
     }
+    
+    console.log('🚫 Complete blacklist:', Array.from(blacklistedNumbers));
+    
+    // STEP 2: Find customer name line in buyer section
+    let foundCustomerPhone = false;
+    let nameLineIndex = -1;
+    
+    for (let i = 0; i < buyerLines.length; i++) {
+      const line = buyerLines[i];
+      // Skip the buyer/recipient header line itself
+      if (/buyer|recipient|bill.*to/i.test(line)) continue;
+      // Skip lines with service/sales/contact keywords
+      if (/service|sales|contact[s]?\s*[:]/i.test(line.toLowerCase())) continue;
+      // If line looks like a name (has letters, not just numbers)
+      if (line.length > 2 && /[a-z]/i.test(line) && !/mobile|phone|gst/i.test(line)) {
+        nameLineIndex = i;
+        console.log('📝 Found customer name at index', i, ':', line);
+        break;
+      }
+    }
+    
+    // STEP 3: Search for Mobile No. AFTER the name line, excluding blacklisted numbers
+    if (nameLineIndex !== -1) {
+      console.log('🔍 Searching for phone after customer name line...');
+      
+      for (let i = nameLineIndex + 1; i < buyerLines.length; i++) {
+        const line = buyerLines[i];
+        console.log(`  Line ${i}:`, line);
+        
+        // Skip any line that has service/sales/contact keywords
+        if (/service|sales|contact[s]?\s*[:]/i.test(line.toLowerCase())) {
+          console.log('⏭️ Skipping service/sales line:', line);
+          continue;
+        }
+        
+        // Look specifically for "Mobile No." pattern (flexible: handles spaces, colons, periods)
+        const mobileMatch = line.match(/mobile\s*no\.?\s*[:\-;\s]*(\d{10})/i);
+        if (mobileMatch) {
+          const phoneNumber = mobileMatch[1];
+          console.log('📱 Found "Mobile No." pattern with number:', phoneNumber);
+          
+          // CHECK: Is this number blacklisted?
+          if (blacklistedNumbers.has(phoneNumber)) {
+            console.log('⛔ This number is blacklisted (service number):', phoneNumber);
+            continue; // Skip this number, keep searching
+          }
+          
+          customer.phone = phoneNumber;
+          customer.whatsapp = phoneNumber;
+          foundCustomerPhone = true;
+          console.log('✅ Found customer mobile after name (not blacklisted):', customer.phone);
+          break;
+        }
+        
+        // Alternative: standalone 10-digit starting with 6-9 (but not blacklisted)
+        if (!foundCustomerPhone && !/service|sales|contact/i.test(line)) {
+          const standaloneMatch = line.match(/\b([6-9]\d{9})\b/);
+          if (standaloneMatch) {
+            const phoneNumber = standaloneMatch[1];
+            console.log('📱 Found standalone number:', phoneNumber);
+            
+            // CHECK: Is this number blacklisted?
+            if (blacklistedNumbers.has(phoneNumber)) {
+              console.log('⛔ This standalone number is blacklisted:', phoneNumber);
+              continue; // Skip this number, keep searching
+            }
+            
+            customer.phone = phoneNumber;
+            customer.whatsapp = phoneNumber;
+            foundCustomerPhone = true;
+            console.log('✅ Found customer phone (standalone, not blacklisted):', customer.phone);
+            break;
+          }
+        }
+      }
+    }
+    
+    // FALLBACK: If still no phone found, search entire buyer section for ANY non-blacklisted number
+    if (!foundCustomerPhone) {
+      console.log('⚠️ No phone found after name, searching entire buyer section...');
+      
+      // Try combining adjacent lines (sometimes "Mobile No." and number are on different lines)
+      for (let i = 0; i < buyerLines.length - 1; i++) {
+        const combinedLine = buyerLines[i] + ' ' + buyerLines[i + 1];
+        const mobileMatch = combinedLine.match(/mobile\s*no\.?\s*[:\-;\s]*(\d{10})/i);
+        if (mobileMatch) {
+          const phoneNumber = mobileMatch[1];
+          if (!blacklistedNumbers.has(phoneNumber)) {
+            customer.phone = phoneNumber;
+            customer.whatsapp = phoneNumber;
+            foundCustomerPhone = true;
+            console.log('✅ FALLBACK: Found Mobile No. across lines:', customer.phone);
+            break;
+          }
+        }
+      }
+      
+      // Last resort: find ANY non-blacklisted number
+      if (!foundCustomerPhone) {
+        for (let i = 0; i < buyerLines.length; i++) {
+          const line = buyerLines[i];
+          // Skip service/sales/contact lines
+          if (/service|sales|contact[s]?\s*[:]/i.test(line.toLowerCase())) continue;
+          
+          const allNumbers = line.match(/\b([6-9]\d{9})\b/g);
+          if (allNumbers) {
+            for (const phoneNumber of allNumbers) {
+              if (!blacklistedNumbers.has(phoneNumber)) {
+                customer.phone = phoneNumber;
+                customer.whatsapp = phoneNumber;
+                foundCustomerPhone = true;
+                console.log('✅ FALLBACK: Found non-blacklisted number in buyer section:', customer.phone);
+                break;
+              }
+            }
+            if (foundCustomerPhone) break;
+          }
+        }
+      }
+    }
+    if (!foundCustomerPhone) {
+      console.warn('⚠️ Could not find customer mobile number in buyer section');
+      console.warn('📋 All lines in buyer section were:', buyerLines);
+    }
   } else {
-    console.warn('⚠️ Buyer section not found in bill text');
+    console.error('❌ Buyer section NOT FOUND in bill text!');
+    console.error('🔍 Searched for keywords:', buyerKeywords);
+    console.error('📄 Lines that contain "buyer" or "bill":', 
+      lines.filter((l, i) => /buyer|bill|recipient/i.test(l)).map((l, i) => `Line ${i}: ${l}`));
   }
 
   // Clean up phone numbers
@@ -1113,15 +1239,18 @@ function parseNavaratnaLines(lines) {
       continue;
     }
 
-    // Detect table end
-    if (inProductTable && /^(total|gst\s+rate|cgst|sgst|taxable\s+value|terms|grand\s+total)/i.test(line)) {
+    // Detect table end - enhanced detection
+    if (inProductTable && /^(total|gst\s+rate|cgst|sgst|taxable\s+value|grand\s+total|inr\s+|finance\s+by|down\s+pay)/i.test(line)) {
       tableEndFound = true;
-      console.log(`📋 Product table ended at line ${i}`);
+      console.log(`📋 Product table ended at line ${i}: "${line}"`);
       break;
     }
 
-    // Skip non-product lines
-    if (/^(total|gst|cgst|sgst|taxable|terms|grand|finance|exchange|down\s+pay|emi)/i.test(line)) continue;
+    // Skip non-product lines - enhanced with more patterns
+    if (/^(total|gst|cgst|sgst|taxable|grand|finance|exchange|down\s+pay|emi|terms|conditions|warranty|installation|demo|service\s+claim|manufacturer|tally|subject|scan\s+to|customer|bank\s+details|authorised)/i.test(line)) {
+      console.log(`⏭️ Skipping non-product line: "${line.substring(0, 60)}"`);
+      continue;
+    }
 
     // MUST start with serial number (1, 2, 3, 4, 5...) OR be a known product pattern
     const startsWithNumber = /^[1-9]\d?\s+/.test(line);
@@ -1257,7 +1386,7 @@ function extractAllProductsAggressive(text, lines) {
     const line = lines[i];
     const lowerLine = line.toLowerCase();
 
-    // Skip obvious non-product lines
+    // Skip obvious non-product lines - ENHANCED with more patterns
     if (lowerLine.includes('navaratna') ||
       lowerLine.includes('invoice') ||
       lowerLine.includes('buyer') ||
@@ -1266,8 +1395,22 @@ function extractAllProductsAggressive(text, lines) {
       lowerLine.includes('taxable value') ||
       lowerLine.includes('cgst') ||
       lowerLine.includes('sgst') ||
-      lowerLine.includes('terms and conditions') ||
-      lowerLine.includes('finance by') ||
+      lowerLine.includes('terms') ||
+      lowerLine.includes('conditions') ||
+      lowerLine.includes('warranty') ||
+      lowerLine.includes('installation') ||
+      lowerLine.includes('service claim') ||
+      lowerLine.includes('manufacturer') ||
+      lowerLine.includes('finance') ||
+      lowerLine.includes('down pay') ||
+      lowerLine.includes('emi amount') ||
+      lowerLine.includes('emi months') ||
+      lowerLine.includes('exchange') ||
+      lowerLine.includes('scan to pay') ||
+      lowerLine.includes('customer') ||
+      lowerLine.includes('signature') ||
+      lowerLine.includes('bank details') ||
+      lowerLine.includes('tally support') ||
       lowerLine.match(/^total\s*$/i)) {
       continue;
     }
@@ -1341,12 +1484,26 @@ function extractAllProductsAggressive(text, lines) {
 
       // If we don't have a product name yet, try to extract from surrounding lines
       if (!productName || productName.length < 2) {
-        // Look at next few lines for product name
+        // Look at next few lines for product name (but NOT "Terms and Conditions" or similar)
         for (let j = i + 1; j < Math.min(i + 3, lines.length); j++) {
           const nextLine = lines[j];
+          const nextLower = nextLine.toLowerCase();
+          
+          // Skip if next line contains non-product keywords
+          if (nextLower.includes('terms') ||
+              nextLower.includes('conditions') ||
+              nextLower.includes('warranty') ||
+              nextLower.includes('total') ||
+              nextLower.includes('gst') ||
+              nextLower.includes('tax') ||
+              nextLower.includes('amount') ||
+              nextLower.includes('finance') ||
+              nextLower.includes('down pay')) {
+            continue;
+          }
+          
           if (nextLine && nextLine.length > 3 &&
             !/^\d+/.test(nextLine) &&
-            !/total|gst|tax|amount|rate/i.test(nextLine) &&
             !/\d{6,}/.test(nextLine)) {
             productName = nextLine;
             console.log(`📝 Found product name in next line: "${productName}"`);
@@ -1355,8 +1512,11 @@ function extractAllProductsAggressive(text, lines) {
         }
       }
 
-      // Create product if we have minimum data
-      if ((productName || companyName !== 'Unknown') && (price > 0 || hsn)) {
+      // Create product ONLY if we have ALL required data:
+      // 1. Valid company name (not "Unknown")
+      // 2. Product name OR HSN code
+      // 3. Price > 100 (minimum reasonable price to filter out junk)
+      if (companyName !== 'Unknown' && (productName || hsn) && price >= 100) {
         const product = {
           name: productName || `Product ${srNo}`,
           companyName: companyName,
@@ -2004,11 +2164,18 @@ function parseProductsSimpleScan(lines) {
 
     // Skip empty lines
     if (!line || line.length < 10) continue;
+    
+    // Skip non-product lines (terms, conditions, headers, footers, instructions)
+    const skipPatterns = /terms|conditions|warranty|installation|finance|tally|subject|jurisdiction|scan to pay|customer.*seal|signature|bank details|cheque|authorised/i;
+    if (skipPatterns.test(line)) {
+      console.log(`⏭️ Skipping non-product line: "${line.substring(0, 60)}..."`);
+      continue;
+    }
 
     console.log(`Checking line ${i}: "${line.substring(0, 60)}..."`);
 
-    // Check for brand (case insensitive)
-    const brandMatch = line.match(/\b(lg|samsung|whirlpool|liebherr|atomberg|apple|sony|dell|hp|lenovo|bajaj|havells|godrej|voltas|daikin|panasonic|philips|bosch|haier|onida|videocon|ifb|mi|xiaomi|realme|vivo|oppo|oneplus|orient|usha|crompton)\b/i);
+    // Check for brand (case insensitive) - added water heater brands
+    const brandMatch = line.match(/\b(mccoy|racold|bajaj|ao smith|crompton|venus|lg|samsung|whirlpool|liebherr|atomberg|apple|sony|dell|hp|lenovo|havells|godrej|voltas|daikin|panasonic|philips|bosch|haier|onida|videocon|ifb|mi|xiaomi|realme|vivo|oppo|oneplus|orient|usha|kenstar|maharaja)\b/i);
 
     if (!brandMatch) continue;
 
