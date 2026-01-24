@@ -1301,6 +1301,7 @@ function parseNavaratnaLines(lines) {
     } else {
       // Extract text after serial number
       const afterSr = line.substring(srNo.length).trim();
+      // eslint-disable-next-line no-useless-escape
       const textMatch = afterSr.match(/^([A-Za-z][A-Za-z0-9\s\-\/]+?)(?:\s+\d{6,})/);
       if (textMatch) {
         const words = textMatch[1].trim().split(/\s+/);
@@ -2633,9 +2634,8 @@ function parseSimpleProductLine(line) {
     } else if (patternIndex === 4) {
       // Pattern 5: Navaratna Image Format "Name HSN GST Serial Qty Rate Amount"
       let qtyStr;
-      // eslint-disable-next-line no-unused-vars
-      let hsn, gstStr;
-      [, serialNumber, productName, hsn, gstStr, productSerial, qtyStr, price, amount] = match;
+      
+      [, serialNumber, productName, , , productSerial, qtyStr, price, amount] = match;
 
       // Extract numeric quantity
       const qMatch = qtyStr.match(/(\d+)/);

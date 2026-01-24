@@ -216,6 +216,7 @@ const AddTicket = ({
         amountReceived: prev.amountReceived || "By Technician",
       }));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketData, productData, customer, prefilledData]);
 
   // Auto-select matching service center when company name matches
