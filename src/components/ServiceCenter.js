@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { onSnapshot, deleteDoc, updateDoc } from 'firebase/firestore';
+import { useNavigate, useParams } from 'react-router-dom';
+import { onSnapshot, deleteDoc } from 'firebase/firestore';
 import { getCollectionRef, getDocRef } from '../firebase/config';
 import AddService from './AddService';
 import ConfirmDialog from './ConfirmDialog';
@@ -11,7 +11,6 @@ import './TechManagement/TechManagement.css';
 
 const ServiceCenter = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { serviceId } = useParams();
   const [services, setServices] = useState([]);
   const [showAddService, setShowAddService] = useState(false);

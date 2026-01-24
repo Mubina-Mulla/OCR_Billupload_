@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { db } from "../firebase/config";
-import { collection, getDocs, doc, setDoc, updateDoc, deleteDoc, addDoc } from "firebase/firestore";
+import { collection, getDocs } from "firebase/firestore";
 import { addAdminUnderSuperAdmin } from "../firebase/addAdminUnderSuperAdmin";
 import { getAdminsUnderSuperAdmin } from "../firebase/getSuperAdminAdmins";
 import { updateAdminUnderSuperAdmin } from "../firebase/updateAdminUnderSuperAdmin";
@@ -15,6 +15,8 @@ export default function AdminManagement() {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const activeView = 'admins'; // Always show admins only
+  
+  // Note: Only admins state is used in this simplified component, but function references remain
   
   // Form fields
   const [name, setName] = useState("");
@@ -254,9 +256,10 @@ export default function AdminManagement() {
     }
   };
 
-  const handleToggleStatus = async (id, currentStatus) => {
+    // eslint-disable-next-line no-unused-vars
+  const handleToggleStatus = async (userId, currentStatus) => {
     try {
-      const result = await updateAdminUnderSuperAdmin(id, { active: !currentStatus });
+      const result = await updateAdminUnderSuperAdmin(userId, { active: !currentStatus });
       if (result.success) loadAdmins();
     } catch (error) {
       console.error("Error toggling status:", error);

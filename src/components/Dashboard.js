@@ -6,8 +6,9 @@ import './Dashboard.css';
 const Dashboard = () => {
   const [filterCategory, setFilterCategory] = useState(null);
   const [activeFilter, setActiveFilter] = useState(null);
-  const [showTickets, setShowTickets] = useState(true); // Show tickets by default
   const [showInStockForm, setShowInStockForm] = useState(false);
+  // eslint-disable-next-line no-unused-vars
+  const [showTickets, setShowTickets] = useState(true);
   const [inStockStatusFilter, setInStockStatusFilter] = useState('active'); // Status filter for In Stock
 
   const sections = [
@@ -27,15 +28,8 @@ const Dashboard = () => {
       setFilterCategory(categoryName); // Show filtered tickets
       setActiveFilter(categoryName); // Activate card
     }
-    setShowTickets(true); // Keep tickets visible
+    // tickets visible by default
     setShowInStockForm(false); // Hide form when switching categories
-  };
-
-  const clearFilter = () => {
-    setFilterCategory(null);
-    setActiveFilter(null);
-    setShowTickets(true); // Keep tickets visible
-    setShowInStockForm(false);
   };
 
   const handleBackFromInStock = () => {

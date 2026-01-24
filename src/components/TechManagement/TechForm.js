@@ -1,6 +1,6 @@
 // src/components/TechManagement/TechForm.jsx
 import React, { useState, useEffect } from "react";
-import { db, getCollectionRef, getDocRef } from "../../firebase/config";
+import { getCollectionRef, getDocRef } from "../../firebase/config";
 import { addDoc, updateDoc } from "firebase/firestore";
 import Notification from '../Notification';
 import useNotification from '../../hooks/useNotification';

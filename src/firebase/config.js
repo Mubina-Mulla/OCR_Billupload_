@@ -3,19 +3,11 @@ import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import {
   getFirestore,
-  enableIndexedDbPersistence,
   collection,
   doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  getDocs,
-  addDoc,
-  deleteDoc,
   collection as fsCollection
 } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getAnalytics } from 'firebase/analytics';
 
 const firebaseConfig = {
   apiKey: "AIzaSyDr1U08ZXQYy2aZbFJugHbplNDDVQlhvGA",
@@ -29,7 +21,7 @@ const firebaseConfig = {
 
 // Init
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+// const analytics = getAnalytics(app); // Unused
 export const auth = getAuth(app);
 export const database = getFirestore(app);
 export const db = database;

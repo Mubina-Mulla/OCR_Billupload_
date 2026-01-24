@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { onSnapshot, deleteDoc, updateDoc, getDocs, collection, doc } from "firebase/firestore";
-import { db, getCollectionRef, getDocRef, getAdminTicketDocRef, getAdminTicketsCollectionRef } from "../firebase/config";
-import { subscribeTickets, fetchTicketsPaginated } from "../firebase/ticketsHelper";
+import { updateDoc, getDocs, collection, doc } from "firebase/firestore";
+import { db, getDocRef, getAdminTicketDocRef, getAdminTicketsCollectionRef, getCollectionRef } from "../firebase/config";
 import ConfirmDialog from './ConfirmDialog';
 import Notification from './Notification';
 import useNotification from '../hooks/useNotification';
@@ -24,11 +23,9 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
   const [displayedTickets, setDisplayedTickets] = useState([]); // Only tickets to show (9 at a time)
   const [currentBatch, setCurrentBatch] = useState(0); // Current batch number (0, 1, 2...)
   const [searchTerm, setSearchTerm] = useState("");
-  const [allCategories, setAllCategories] = useState([]);
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [statusFilter, setStatusFilter] = useState("active"); // "active", "cancelled", "resolved", "all"
-  const [technicians, setTechnicians] = useState([]);
   const [confirmDialog, setConfirmDialog] = useState({ isOpen: false, type: '', ticketId: null });
 
   const [isLoading, setIsLoading] = useState(cachedTickets.length === 0); // Only show loading if no cache
@@ -37,10 +34,12 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
   const { notification, showNotification, hideNotification } = useNotification();
   const [editingNote, setEditingNote] = useState({}); // Track which ticket's note is being edited
   const [noteValues, setNoteValues] = useState({}); // Store note values being edited
-  const [editingTicket, setEditingTicket] = useState({}); // Track which ticket is in full edit mode
   const [ticketEditValues, setTicketEditValues] = useState({}); // Store ticket field values being edited
   const [showExportMenu, setShowExportMenu] = useState(false); // Track export menu visibility
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false); // Track Add Customer modal visibility
+  const [allCategories, setAllCategories] = useState([]);
+  const [editingTicket, setEditingTicket] = useState(null);
+  const [technicians, setTechnicians] = useState([]);
 
 
 
@@ -125,7 +124,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
 
       // Load only current user's tickets to prevent Firestore internal errors
       const currentUserId = getCurrentUserId();
-      const currentUserName = getCurrentUserName();
+      // const currentUserName = getCurrentUserName(); // Unused
 
       if (currentUserId) {
         try {
@@ -311,10 +310,12 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       ticketUserId: userId,
       ticketUserIdType: typeof userId,
       strictMatch: currentUserId === userId,
+      // eslint-disable-next-line eqeqeq
       looseMatch: currentUserId == userId
     });
 
     // Only block if both IDs exist and don't match (using loose equality to handle string/number differences)
+    // eslint-disable-next-line eqeqeq
     if (currentUserId && userId && currentUserId != userId) {
       showNotification('You are not authorized to cancel this ticket. Only the admin who created it can make changes.', 'warning');
       return;
@@ -381,10 +382,12 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       ticketUserId: userId,
       ticketUserIdType: typeof userId,
       strictMatch: currentUserId === userId,
+      // eslint-disable-next-line eqeqeq
       looseMatch: currentUserId == userId
     });
 
     // Only block if both IDs exist and don't match (using loose equality to handle string/number differences)
+    // eslint-disable-next-line eqeqeq
     if (currentUserId && userId && currentUserId != userId) {
       showNotification('You are not authorized to modify this ticket. Only the admin who created it can make changes.', 'warning');
       return;
@@ -652,7 +655,8 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       }
     }
   };
-
+// End of commented out updateTicketStatus
+  
   // ✅ Updated Priority Colors: High=Red, Medium=Yellow, Low=Green
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
@@ -876,6 +880,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       return dateA - dateB;
     });
 
+/*
   // Get total count from all tickets (for display)
   const totalFilteredCount = allTickets
     .filter(ticket => {
@@ -926,6 +931,7 @@ const Tickets = ({ filterCategory, excludeResolved = false, showStatusFilter = t
       const resolvedMatch = excludeResolved ? ticket.status !== 'Resolved' && ticket.status !== 'Cancelled' : true;
       return searchMatch && categoryMatch && dateMatch && statusMatch && resolvedMatch && inStockMatch;
     }).length;
+*/
 
   const getCategoryDisplayName = (category) => {
     const categoryMap = {

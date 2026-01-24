@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { addDoc, onSnapshot, updateDoc, deleteDoc } from 'firebase/firestore';
-import { getCollectionRef, getDocRef, uploadBillImage } from '../firebase/config';
+import { getCollectionRef, getDocRef } from '../firebase/config';
 import AddProduct from './AddProduct';
 import AddTicket from './AddTicket';
 import BillGenerator from './BillGenerator';
@@ -31,8 +31,6 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
   const [editingProduct, setEditingProduct] = useState(null);
   const [tempProducts, setTempProducts] = useState([]);
   const [isUploadingBill, setIsUploadingBill] = useState(false);
-  const [hasAutoFilledData, setHasAutoFilledData] = useState(false);
-  const [billImageUrl, setBillImageUrl] = useState(''); // Store uploaded bill image URL
   const { notification, showNotification, hideNotification } = useNotification();
 
   // Clear form data on component mount to ensure fresh start
@@ -53,7 +51,6 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
 
     // Reset temp products and bill image
     setTempProducts([]);
-    setBillImageUrl('');
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
@@ -79,10 +76,9 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
 
     console.log('🟡 Processing uploaded bill:', file.name, 'Type:', file.type);
     setIsUploadingBill(true);
-    setHasAutoFilledData(false);
 
     try {
-      // REMOVED: Image storage upload - images are NOT saved to Firebase Storage
+      // Image storage upload REMOVED - images are NOT saved to Firebase Storage
       // We only perform OCR extraction without storing the image
       
       console.log('📄 Scanning and extracting data from bill...');
@@ -109,14 +105,9 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
         console.log('🟢 Customer data extracted:', extractedData.customer);
 
         // Check if we have meaningful data
-        const hasData = extractedData.customer.name || extractedData.customer.phone || extractedData.customer.address;
+        // const hasData = extractedData.customer.name || extractedData.customer.phone || extractedData.customer.address;
 
-        if (hasData) {
-          setHasAutoFilledData(true);
-        }
-
-        // STEP 3: Fill form fields with extracted data
-        console.log('📝 STEP 3: Auto-filling form with extracted data...');
+        // STEP 3: Fill form fields with extracted dataextracted data...');
         
         // Update customer form with extracted data
         setFormData(prev => ({
@@ -351,20 +342,20 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
       joinDate: ''
     });
     setTempProducts([]);
-    setBillImageUrl(''); // Clear bill image URL
+    // Removed bill image
+    // Clear all localStorage data
+    localStorage.removeItem('tempProducts');
+    localStorage.removeItem('customerFormData');
+    setTempProducts([]);
     // Clear all localStorage data
     localStorage.removeItem('tempProducts');
     localStorage.removeItem('customerFormData');
     setAddedCustomer(null);
-    setHasAutoFilledData(false);
     showNotification('Ready to add new customer', 'info');
   };
 
-  const handleShowAddProduct = () => {
-    setShowAddProduct(true);
-  };
-
   const handleCloseAddProduct = () => setShowAddProduct(false);
+  const handleShowAddProduct = () => setShowAddProduct(true);
 
   const handleProductAdded = (productData) => {
     const newProduct = {
@@ -402,22 +393,14 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
     }
   };
 
-  const handleShowBillGenerator = () => {
-    setShowBillGenerator(true);
-  };
   const handleCloseBillGenerator = () => {
     setShowBillGenerator(false);
     setEditingProduct(null);
   };
 
   const handleEditProduct = (product) => {
-    if (product.tempId) {
-      setEditingProduct(product);
-      setShowEditProduct(true);
-    } else {
-      setEditingProduct(product);
-      setShowEditProduct(true);
-    }
+    setEditingProduct(product);
+    setShowEditProduct(true);
   };
 
   const handleCloseEditProduct = () => {
@@ -481,22 +464,10 @@ const AddCustomer = ({ onBack, backText = 'Back to Customers', autoClose = false
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const customerProducts = addedCustomer
     ? allProducts.filter(product => product.customerId === addedCustomer?.id)
     : [];
-
-  const sortedCustomerProducts = customerProducts.sort((a, b) => {
-    const dateA = new Date(a.createdAt || 0);
-    const dateB = new Date(b.createdAt || 0);
-    return dateB - dateA;
-  });
-
-  const getStockClass = (stock) => {
-    const stockValue = parseInt(stock);
-    if (stockValue === 0) return 'stock-out';
-    if (stockValue < 10) return 'stock-low';
-    return 'stock-ok';
-  };
 
   const canAddCustomer = formData.name && formData.phone && !addedCustomer;
 

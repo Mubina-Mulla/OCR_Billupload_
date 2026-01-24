@@ -14,8 +14,8 @@ class InvoiceDataExtractor {
       percentage: /(\d{1,2}(?:\.\d{1,2})?)\s*%/g,
       hsnCode: /(\d{8})/g,
       stateCode: /(?:state\s*code|code)[\s:]*(\d{1,2})/gi,
-      invoiceNumber: /(?:invoice|bill)\s*(?:no|number)[\s:]*([a-z0-9\-\/]+)/gi,
-      date: /(?:date)[\s:]*(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/gi
+      invoiceNumber: /(?:invoice|bill)\s*(?:no|number)[\s:]*([a-z0-9-/]+)/gi,
+      date: /(?:date)[\s:]*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})/gi
     };
 
     // Common company names for better extraction - Enhanced with Racold and others
@@ -157,8 +157,8 @@ class InvoiceDataExtractor {
     // Only look for patterns like "Mobile No." or "Phone:" within customerLines
     for (const line of customerLines) {
       // Look for labeled mobile/phone numbers in buyer section only
-      const mobileMatch = line.match(/(?:mobile|mob)\s*(?:no\.?)?\s*[:\-]?\s*(\d{10})/i);
-      const phoneMatch = line.match(/(?:phone|ph)\s*(?:no\.?)?\s*[:\-]?\s*(\d{10})/i);
+      const mobileMatch = line.match(/(?:mobile|mob)\s*(?:no\.?)?\s*[-:]?\s*(\d{10})/i);
+      const phoneMatch = line.match(/(?:phone|ph)\s*(?:no\.?)?\s*[-:]?\s*(\d{10})/i);
       
       if (mobileMatch && !customer.mobile) {
         customer.mobile = mobileMatch[1];

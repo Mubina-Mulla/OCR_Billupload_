@@ -6,10 +6,8 @@
 import { 
   collectionGroup, 
   query, 
-  where, 
   getDocs,
-  deleteDoc,
-  doc
+  deleteDoc
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 

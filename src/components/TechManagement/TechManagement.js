@@ -531,7 +531,8 @@ const Technicians = () => {
                   </thead>
                   <tbody>
                     {techTickets.map(ticket => {
-                      const getPriorityColor = (priority) => {
+                      // eslint-disable-next-line no-unused-vars
+  const getPriorityColor = (priority) => {
                         switch (priority?.toLowerCase()) {
                           case "high": return "#dc2626";
                           case "medium": return "#facc15";

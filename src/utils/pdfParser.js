@@ -374,7 +374,7 @@ async function extractTextFromPdf(file) {
       for (let i = 0; i < textItems.length; i++) {
         const item = textItems[i];
         const y = Math.round(item.transform[5]);
-        const x = Math.round(item.transform[4]);
+        // const x = Math.round(item.transform[4]); // Unused
 
         // Check if we're on a new line
         if (currentY !== null && Math.abs(y - currentY) > 2) {
@@ -687,10 +687,10 @@ function parseCustomerDetails(text) {
 
   // Clean up phone numbers
   if (customer.phone) {
-    customer.phone = customer.phone.replace(/[\s\-\(\)]/g, '');
+    customer.phone = customer.phone.replace(/[\s\-()]/g, '');
   }
   if (customer.whatsapp) {
-    customer.whatsapp = customer.whatsapp.replace(/[\s\-\(\)]/g, '');
+    customer.whatsapp = customer.whatsapp.replace(/[\s\-()]/g, '');
   }
 
   // Sanitize fields
@@ -858,17 +858,17 @@ function parseProductGroup(group) {
     // Pattern 2: Tab-separated without quantity - "1\tWhirlpool\t001\t17900.00\t15169.49"
     /^(\d+)\s*\t\s*([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/,
     // Pattern 3: Mixed format with quantity - "2 Apple\t1\tTV\t3\t149999.97\t449999.91"
-    /^(\d+)\s+([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([A-Za-z][A-Za-z0-9\s\-]*?)\s*\t\s*(\d+)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/,
+    /^(\d+)\s+([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([A-Za-z][A-Za-z0-9\s-]*?)\s*\t\s*(\d+)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/,
     // Pattern 4: Mixed format without quantity - "2 Apple\t1\tTV\t149999.97\t299999.94"
-    /^(\d+)\s+([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([A-Za-z][A-Za-z0-9\s\-]*?)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/,
+    /^(\d+)\s+([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([A-Za-z][A-Za-z0-9\s-]*?)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/,
     // Pattern 5: Sr Company Serial ProductName Qty Price Amount (space-separated)
-    /^(\d+)\s+([A-Za-z][A-Za-z0-9\s\.\-]*?)\s+([A-Za-z0-9\(\)\-]+)\s+(.+?)\s+(\d+)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/,
+    /^(\d+)\s+([A-Za-z][A-Za-z0-9\s.-]*?)\s+([A-Za-z0-9()-]+)\s+(.+?)\s+(\d+)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/,
     // Pattern 6: Sr Company ProductName Qty Price Amount (no serial, space-separated)
-    /^(\d+)\s+([A-Za-z][A-Za-z0-9\s\.\-]*?)\s+(.+?)\s+(\d+)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/,
+    /^(\d+)\s+([A-Za-z][A-Za-z0-9\s.-]*?)\s+(.+?)\s+(\d+)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/,
     // Pattern 7: Standalone product line with quantity - "Apple	123	Iphone SE	2	40000.00	80000.00"
-    /^([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([A-Za-z][A-Za-z0-9\s\-]*?)\s*\t\s*(\d+)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/,
+    /^([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([A-Za-z][A-Za-z0-9\s-]*?)\s*\t\s*(\d+)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/,
     // Pattern 8: Standalone product line without quantity - "Apple	123	Iphone SE	40000.00	40000.00"
-    /^([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([A-Za-z][A-Za-z0-9\s\-]*?)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/,
+    /^([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([A-Za-z][A-Za-z0-9\s-]*?)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/,
     // Pattern 9: More flexible pattern
     /^(\d+)\s+([A-Za-z][A-Za-z\s]*?)\s+(\d*)\s*(.+?)\s+([\d,]+\.?\d*)\s+([\d,]+\.?\d*)$/
   ];
@@ -1119,7 +1119,7 @@ function parseSpecificInvoicePatterns(text) {
     }
 
     // Pattern 2: "2 Apple\t1\tTV\t3\t149999.97\t449999.91" (with quantity)
-    const pattern2WithQty = /^(\d+)\s+([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([A-Za-z][A-Za-z0-9\s\-]*?)\s*\t\s*(\d+)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/;
+    const pattern2WithQty = /^(\d+)\s+([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([A-Za-z][A-Za-z0-9\s-]*?)\s*\t\s*(\d+)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/;
     const match2WithQty = line.match(pattern2WithQty);
 
     if (match2WithQty) {
@@ -1162,7 +1162,7 @@ function parseSpecificInvoicePatterns(text) {
     }
 
     // Pattern 2b: "2 Apple\t1\tTV\t149999.97\t299999.94" (without quantity)
-    const pattern2 = /^(\d+)\s+([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([A-Za-z][A-Za-z0-9\s\-]*?)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/;
+    const pattern2 = /^(\d+)\s+([A-Za-z]+)\s*\t\s*(\d+)\s*\t\s*([A-Za-z][A-Za-z0-9\s-]*?)\s*\t\s*([\d,]+\.?\d*)\s*\t\s*([\d,]+\.?\d*)$/;
     const match2 = line.match(pattern2);
 
     if (match2) {
@@ -1224,7 +1224,7 @@ function parseNavaratnaLines(lines) {
 
   // Track if we're in the product table section
   let inProductTable = false;
-  let tableEndFound = false;
+  // let tableEndFound = false; // Unused
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -1241,7 +1241,7 @@ function parseNavaratnaLines(lines) {
 
     // Detect table end - enhanced detection
     if (inProductTable && /^(total|gst\s+rate|cgst|sgst|taxable\s+value|grand\s+total|inr\s+|finance\s+by|down\s+pay)/i.test(line)) {
-      tableEndFound = true;
+      // tableEndFound = true;
       console.log(`📋 Product table ended at line ${i}: "${line}"`);
       break;
     }
@@ -1293,7 +1293,7 @@ function parseNavaratnaLines(lines) {
 
       // Match everything until we hit a 4+ digit number (HSN/Serial) or percentage
       // Enhanced pattern to capture product names like "LED 43UR7550SLC ATR" or "Ref FF TDPsg9 31Ti(18L J'steel)"
-      const nameMatch = afterCompany.match(/^([A-Za-z0-9\s\-\/\(\)\']+?)(?:\s+\d{4,}|\s+\d+\s*%|\s+\d+\s+No)/i);
+      const nameMatch = afterCompany.match(/^([A-Za-z0-9\s-/'()]+?)(?:\s+\d{4,}|\s+\d+\s*%|\s+\d+\s+No)/i);
       productName = nameMatch ? nameMatch[1].trim() : afterCompany.split(/\s+\d{6,}/)[0].trim();
 
       // Clean up product name - remove trailing numbers that might be HSN fragments
@@ -1696,7 +1696,7 @@ function parseNavaratnaVisualTable(text) {
       if (companyIndex !== -1) {
         const afterCompany = line.substring(companyIndex + companyName.length);
         // Take text until we hit a large number (HSN) or price pattern
-        const nameMatch = afterCompany.match(/^\s*([A-Za-z0-9\s\-\/]+?)(?:\s+\d{6,}|\s+\d+%|\s+\d+\s+Nos?)/i);
+        const nameMatch = afterCompany.match(/^\s*([A-Za-z0-9\s-/]+?)(?:\s+\d{6,}|\s+\d+%|\s+\d+\s+Nos?)/i);
         if (nameMatch) {
           productName = nameMatch[1].trim();
         }
@@ -1996,14 +1996,14 @@ function parseNavaratnaBillTable(text, lines) {
       // Extract product name until HSN code (4-10 digits) or amount pattern
       // Examples: "Gas Geyser ECO 6L NF" or "Mixer HL7756 750W 3J"
       // Enhanced to handle HSN codes of varying lengths (4-10 digits)
-      let nameMatch = afterCompanyName.match(/^([A-Za-z0-9\s\-\/\(\)\'\.]+?)(?:\s+\d{4,10}|\s+\d+\s*No\.?|\s+\d+%)/i);
+      let nameMatch = afterCompanyName.match(/^([A-Za-z0-9\s-/'().]+?)(?:\s+\d{4,10}|\s+\d+\s*No\.?|\s+\d+%)/i);
 
       if (nameMatch) {
         productName = nameMatch[1].trim();
         console.log('🎯 PRODUCT NAME (Pattern 1 - before HSN/No):', productName);
       } else {
         // If no HSN found, try to extract until price pattern (numbers with comma/decimal)
-        nameMatch = afterCompanyName.match(/^([A-Za-z0-9\s\-\/\(\)\'\.]+?)(?:\s+[\d,]+\.\d{2})/i);
+        nameMatch = afterCompanyName.match(/^([A-Za-z0-9\s-/'().]+?)(?:\s+[\d,]+\.\d{2})/i);
         if (nameMatch) {
           productName = nameMatch[1].trim();
           console.log('🎯 PRODUCT NAME (Pattern 2 - before price):', productName);
@@ -2040,7 +2040,7 @@ function parseNavaratnaBillTable(text, lines) {
       serialNumber = hsn;
     } else {
       // Look for number after dash (like "- 151013")
-      const dashSerialMatch = line.match(/\-\s*(\d{4,8})/);
+      const dashSerialMatch = line.match(/-\s*(\d{4,8})/);
       if (dashSerialMatch) {
         serialNumber = dashSerialMatch[1];
       } else {
@@ -2198,7 +2198,7 @@ function parseProductsSimpleScan(lines) {
 
     // Extract product name - stop at HSN (6-8 digits) or quantity pattern
     let productName = '';
-    const namePattern = /^([A-Za-z0-9\s\-\/\(\)\'\.]+?)(?:\s+\d{6,8}|\s+\d+\s+No\.?|\s+\d+\s+\d+\s+)/i;
+    const namePattern = /^([A-Za-z0-9\s-/'().]+?)(?:\s+\d{6,8}|\s+\d+\s+No\.?|\s+\d+\s+\d+\s+)/i;
     const nameMatch = afterBrand.match(namePattern);
 
     if (nameMatch) {
@@ -2224,7 +2224,7 @@ function parseProductsSimpleScan(lines) {
     const hsn = hsnMatch ? hsnMatch[1] : '';
 
     // Extract serial number (3-5 digit number, possibly with parentheses like "3111(18L")
-    const serialMatch = line.match(/\b(\d{3,5}(?:\([^\)]*\))?)/);
+    const serialMatch = line.match(/\b(\d{3,5}(?:\([^)]*\))?)/);
     const serialNumber = serialMatch ? serialMatch[1] : '';
 
     // Extract quantity
@@ -2632,7 +2632,9 @@ function parseSimpleProductLine(line) {
       stockQty = 1; // Default when not provided
     } else if (patternIndex === 4) {
       // Pattern 5: Navaratna Image Format "Name HSN GST Serial Qty Rate Amount"
-      let hsn, gstStr, qtyStr;
+      let qtyStr;
+      // eslint-disable-next-line no-unused-vars
+      let hsn, gstStr;
       [, serialNumber, productName, hsn, gstStr, productSerial, qtyStr, price, amount] = match;
 
       // Extract numeric quantity

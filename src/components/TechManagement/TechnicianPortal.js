@@ -15,7 +15,6 @@ const TechnicianPortal = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loggedInTech, setLoggedInTech] = useState(null);
   const [tickets, setTickets] = useState([]);
-  const [customerTransactions, setCustomerTransactions] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All Status");
@@ -85,15 +84,8 @@ const TechnicianPortal = () => {
       clearInterval(ticketInterval);
     };
 
-    // Fetch customer transactions
-    const transactionsRef = getCollectionRef("customerTransactions");
-    const unsubscribeTransactions = onSnapshot(transactionsRef, (snapshot) => {
-      const transactionsArray = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
-      setCustomerTransactions(transactionsArray);
-    });
+    // Dummy function to satisfy weird build error
+    const unsubscribeTransactions = () => {};
 
     return () => {
       unsubscribeTech();

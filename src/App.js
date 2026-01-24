@@ -1,12 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
-import { onSnapshot } from 'firebase/firestore';
-import { getCollectionRef } from './firebase/config';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
 import CustomerManagement from './components/CustomerManagement';
-import ProductManagement from './components/ProductManagement';
 import ServiceCenter from './components/ServiceCenter';
 import TechManagement from './components/TechManagement/TechManagement';
 import TechnicianPortal from './components/TechManagement/TechnicianPortal';
@@ -115,7 +112,7 @@ const MainLayout = ({ user, handleLogout, stats }) => {
 function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
+  const [stats] = useState({
     customers: 0,
     products: 0,
     services: 0,

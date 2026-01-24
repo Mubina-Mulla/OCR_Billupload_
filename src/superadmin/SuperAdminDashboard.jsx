@@ -1,28 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-import { db } from "../firebase/config";
-import { collection, addDoc, getDocs, doc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
-import initializeUserTickets from "../firebase/initializeUserTickets";
-import resetUserPassword from "../firebase/resetUserPassword";
 import AdminManagement from "./AdminManagement";
-import DeleteTicketsByEmail from "../components/DeleteTicketsByEmail";
 import "./SuperAdminDashboard.css";
 
 export default function SuperAdminDashboard() {
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState("admin");
-  const [users, setUsers] = useState([]);
-  const [tickets, setTickets] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
   
   const navigate = useNavigate();
-  const auth = getAuth();
 
   // Check super admin authentication (hardcoded system)
   useEffect(() => {
@@ -46,217 +30,6 @@ export default function SuperAdminDashboard() {
     checkAuth();
   }, [navigate]);
 
-  // Firestore paths
-  const usersRef = collection(db, "mainData", "Billuload", "users");
-  const adminRef = collection(db, "mainData", "Billuload", "Admin");
-
-  const loadUsers = async () => {
-    setLoading(true);
-    try {
-      const snapshot = await getDocs(usersRef);
-      setUsers(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    } catch (error) {
-      console.error("Error loading users:", error);
-      alert("Error loading users");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadTickets = async () => {
-    try {
-      console.log('🎯 SuperAdmin: Loading tickets from all users...');
-      const usersSnapshot = await getDocs(usersRef);
-      const allTickets = [];
-      
-      for (const userDoc of usersSnapshot.docs) {
-        const userTicketsRef = collection(db, 'mainData', 'Billuload', 'users', userDoc.id, 'tickets');
-        const ticketsSnapshot = await getDocs(userTicketsRef);
-        
-        ticketsSnapshot.docs.forEach(ticketDoc => {
-          allTickets.push({
-            id: ticketDoc.id,
-            userId: userDoc.id,
-            userEmail: userDoc.data().email,
-            userName: userDoc.data().name,
-            ...ticketDoc.data()
-          });
-        });
-      }
-      
-      setTickets(allTickets);
-      console.log(`🎯 SuperAdmin: Loaded ${allTickets.length} tickets from ${usersSnapshot.docs.length} users`);
-    } catch (error) {
-      console.error("Error loading tickets:", error);
-    }
-  };
-
-  // Calculate points for each user based on their tickets
-  const calculateUserPoints = (userName) => {
-    const userTickets = tickets.filter(ticket => 
-      ticket.userName === userName || 
-      ticket.userEmail === userName ||
-      ticket.assignedTo === userName ||
-      ticket.subOption === userName
-    );
-
-    let totalPoints = 0;
-    let completedTickets = 0;
-    let totalTickets = userTickets.length;
-
-    userTickets.forEach(ticket => {
-      if (ticket.status === 'Completed' || ticket.status === 'Resolved') {
-        completedTickets++;
-        // Points based on category
-        if (ticket.category === 'In Store') {
-          totalPoints += 100;
-        } else if (ticket.category === 'Third Party') {
-          totalPoints += 150;
-        } else if (ticket.category === 'Pickup') {
-          totalPoints += 75;
-        } else {
-          totalPoints += 50;
-        }
-      }
-    });
-
-    return {
-      totalPoints,
-      completedTickets,
-      totalTickets,
-      pendingTickets: totalTickets - completedTickets
-    };
-  };
-
-  useEffect(() => {
-    if (isAuthenticated) {
-      loadUsers();
-      loadTickets();
-    }
-  }, [isAuthenticated]);
-
-  const addUser = async () => {
-    if (!name || !email || !password) {
-      alert("Please fill in all fields");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Step 1: Create user in Firebase Auth
-      console.log("🔐 Creating user in Firebase Auth...");
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const firebaseUser = userCredential.user;
-      
-      console.log("✅ Firebase Auth user created:", firebaseUser.uid);
-
-      // Step 2: Create user document in Firestore
-      console.log("📝 Creating user document in Firestore...");
-      const userDocRef = doc(db, "mainData", "Billuload", "users", firebaseUser.uid);
-      
-      const userData = {
-        name: name,
-        email: email,
-        role: role,
-        active: true,
-        createdAt: new Date().toISOString(),
-        createdBy: "superadmin"
-      };
-
-      await setDoc(userDocRef, userData);
-      console.log("✅ User document created in Firestore");
-
-      // Step 3: Initialize tickets subcollection
-      console.log("🎫 Initializing tickets subcollection...");
-      const ticketsCollectionRef = collection(db, "mainData", "Billuload", "users", firebaseUser.uid, "tickets");
-      
-      // Create placeholder ticket to initialize the subcollection
-      await addDoc(ticketsCollectionRef, {
-        isPlaceholder: true,
-        createdAt: new Date().toISOString(),
-        note: "Placeholder ticket to initialize subcollection - can be deleted when real tickets are added"
-      });
-      
-      console.log("✅ Tickets subcollection initialized");
-
-      // Reset form
-      setName("");
-      setEmail("");
-      setPassword("");
-      setRole("admin");
-      
-      // Reload users
-      loadUsers();
-      
-      alert(`✅ User created successfully!\n\n` +
-            `👤 Name: ${name}\n` +
-            `📧 Email: ${email}\n` +
-            `🔑 Role: ${role}\n` +
-            `🎫 Tickets subcollection: Initialized\n` +
-            `🔐 Firebase Auth: Created`);
-      
-    } catch (error) {
-      console.error("Error adding user:", error);
-      
-      let errorMessage = "Error creating user: ";
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage += "Email is already in use";
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage += "Password is too weak (minimum 6 characters)";
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage += "Invalid email address";
-      } else {
-        errorMessage += error.message;
-      }
-      
-      alert("❌ " + errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const toggleUserStatus = async (userId, currentStatus) => {
-    try {
-      const userDoc = doc(db, "mainData", "Billuload", "users", userId);
-      await updateDoc(userDoc, { active: !currentStatus });
-      loadUsers();
-    } catch (error) {
-      console.error("Error updating user status:", error);
-      alert("Error updating user status");
-    }
-  };
-
-  const deleteUser = async (userId) => {
-    if (window.confirm("Are you sure you want to delete this user?")) {
-      try {
-        const userDoc = doc(db, "mainData", "Billuload", "users", userId);
-        await deleteDoc(userDoc);
-        loadUsers();
-        alert("User deleted successfully");
-      } catch (error) {
-        console.error("Error deleting user:", error);
-        alert("Error deleting user");
-      }
-    }
-  };
-
-  const handleResetPassword = async (userEmail) => {
-    if (window.confirm(`🔐 Send password reset email to ${userEmail}?`)) {
-      try {
-        const result = await resetUserPassword(userEmail);
-        
-        if (result.success) {
-          alert(`✅ ${result.message}`);
-        } else {
-          alert(`❌ ${result.error}`);
-        }
-      } catch (error) {
-        console.error("Password reset error:", error);
-        alert("❌ Error sending password reset email");
-      }
-    }
-  };
-
   const handleLogout = async () => {
     try {
       // Clear super admin data and redirect to login
@@ -268,40 +41,6 @@ export default function SuperAdminDashboard() {
       alert("❌ Error logging out");
     }
   };
-
-  const handleInitializeUserTickets = async () => {
-    if (window.confirm("🚀 This will initialize tickets subcollection for all users and fix login issues. Continue?")) {
-      try {
-        setLoading(true);
-        const results = await initializeUserTickets();
-        
-        const message = `✅ Initialization completed!\n\n` +
-          `📊 Results:\n` +
-          `• Total users: ${results.totalUsers}\n` +
-          `• Users with existing tickets: ${results.usersWithTickets}\n` +
-          `• Users initialized: ${results.usersInitialized}\n` +
-          `• Users fixed: ${results.usersFixed}\n` +
-          `• Errors: ${results.errors.length}`;
-        
-        alert(message);
-        
-        // Reload users to see updates
-        loadUsers();
-      } catch (error) {
-        console.error("Initialize error:", error);
-        alert("❌ Error during initialization: " + error.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
-
-
-
-  const filteredUsers = users.filter(user =>
-    (user.name ?? "").toLowerCase().includes((searchTerm ?? "").toLowerCase()) ||
-    (user.email ?? "").toLowerCase().includes((searchTerm ?? "").toLowerCase())
-  );
 
   // Show loading screen while checking authentication
   if (!isAuthenticated) {
@@ -421,11 +160,6 @@ export default function SuperAdminDashboard() {
       <AdminManagement />
         </div>
       </div>
-
-      {/* Delete Tickets Modal */}
-      {showDeleteModal && (
-        <DeleteTicketsByEmail onClose={() => setShowDeleteModal(false)} />
-      )}
     </div>
   );
 }

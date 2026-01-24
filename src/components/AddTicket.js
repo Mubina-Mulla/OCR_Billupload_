@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { addDoc, updateDoc, onSnapshot, setDoc, doc, collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { addDoc, onSnapshot, setDoc, doc, collection, getDocs } from "firebase/firestore";
 import {
   db,
   getCollectionRef,
-  getDocRef,
-  getAdminTicketsCollectionRef,
-  getAdminTicketDocRef
+  getAdminTicketsCollectionRef
 } from "../firebase/config";
 import Notification from "./Notification";
 import useNotification from "../hooks/useNotification";
@@ -118,6 +116,7 @@ const AddTicket = ({
       }
     };
     initTicketNumber();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const getCurrentAdminInfo = () => {
@@ -261,6 +260,7 @@ const AddTicket = ({
         }
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [formData.category, formData.companyName, formData.brand, serviceCenters, formData.subOption]);
 
   const handleChange = (e) => {

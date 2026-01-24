@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { getConnectionStatus } from '../firebase/config';
 import './ConnectionStatus.css';
 
 const ConnectionStatus = () => {
